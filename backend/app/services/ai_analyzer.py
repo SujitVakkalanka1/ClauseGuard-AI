@@ -20,7 +20,10 @@ Focus especially on high-risk categories:
 7. Arbitration & Governing Law (unfavorable jurisdiction, waiver of jury trial / class actions)
 
 NOTE FOR NON-CONTRACT DOCUMENTS:
-If the input text is an academic paper, project abstract, homework assignment, resume, or non-contract document that does not contain legal contract clauses, you MUST return an empty array for "clauses": [], set "overallRisk": "Low", and state in "summary" that no legal contract risks were found.
+If the input text is an academic paper, project abstract, homework assignment, research report, resume, or non-contract document that does not contain legal contract clauses, you MUST:
+1. Return an empty array for "clauses": []
+2. Set "overallRisk": "Low"
+3. In "summary", explicitly identify the specific document type detected (e.g., "This document appears to be an academic project abstract/paper rather than a commercial legal contract") and confirm that no high-risk legal contract terms were found.
 
 You MUST respond strictly with a valid JSON object adhering to this exact schema:
 {
@@ -221,7 +224,18 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
     # If document has no matching legal contract clauses (e.g. academic paper, abstract, or non-contract file)
     if not detected_clauses:
         overall = "Low"
-        summary = "Document analysis complete. No high-risk or predatory legal contract clauses were identified in this document."
+        lower_text = text.lower()
+        if any(w in lower_text for w in ["abstract", "thesis", "project", "university", "paper", "author", "introduction", "research", "dsa"]):
+            doc_type = "an academic project abstract / research document"
+        elif any(w in lower_text for w in ["resume", "curriculum vitae", "education", "experience"]):
+            doc_type = "a resume / CV"
+        else:
+            doc_type = "a general non-contract document"
+
+        summary = (
+            f"Document analysis complete: This file appears to be {doc_type} rather than a commercial legal agreement. "
+            f"No high-risk or predatory legal contract clauses were identified."
+        )
     else:
         # Calculate overall risk
         high_count = sum(1 for c in detected_clauses if c.risk == "High")

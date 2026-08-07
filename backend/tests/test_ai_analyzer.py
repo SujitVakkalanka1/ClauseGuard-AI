@@ -32,3 +32,16 @@ def test_ai_analyzer_heuristic_output():
 def test_ai_analyzer_too_short_text():
     with pytest.raises(ValueError, match="too short"):
         analyze_contract_text("Short text")
+
+def test_ai_analyzer_academic_document():
+    academic_text = """
+    DSA3 Project Abstract
+    Title: Distributed Systems and Algorithmic Complexity Analysis
+    Author: University Research Group
+    This project explores graph partitioning techniques for large-scale data structures.
+    """
+    report = analyze_contract_text(academic_text)
+    assert report.overallRisk == "Low"
+    assert len(report.clauses) == 0
+    assert "academic" in report.summary.lower() or "non-contract" in report.summary.lower()
+
