@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALGORAND_SENDER_MNEMONIC=${ALGORAND_SENDER_MNEMONIC}
+      - ALGORAND_RECIPIENT_ADDRESS=${ALGORAND_RECIPIENT_ADDRESS}
+      - ALGORAND_ALGOD_SERVER=${ALGORAND_ALGOD_SERVER}
+    volumes:
+      - ./backend/app/uploads:/app/app/uploads
+      - contracts_data:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  contracts_data:
