@@ -7,7 +7,7 @@ from app.schemas import ContractReport, ClauseAnalysis
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an expert legal counsel and risk analysis engine specializing in contract analysis.
+SYSTEM_PROMPT = """You are an expert legal counsel and risk analysis engine specializing in commercial contract analysis.
 Your job is to analyze contract text, extract legal clauses, classify each clause, assign a risk level, explain why it is risky, and suggest a safer rewording.
 
 Focus especially on high-risk categories:
@@ -18,6 +18,9 @@ Focus especially on high-risk categories:
 5. IP Assignment (unrestricted assignment of background IP or work product)
 6. Non-Compete / Non-Solicit (overly broad scope, long duration, geographic limits)
 7. Arbitration & Governing Law (unfavorable jurisdiction, waiver of jury trial / class actions)
+
+NOTE FOR NON-CONTRACT DOCUMENTS:
+If the input text is an academic paper, project abstract, homework assignment, resume, or non-contract document that does not contain legal contract clauses, you MUST return an empty array for "clauses": [], set "overallRisk": "Low", and state in "summary" that no legal contract risks were found.
 
 You MUST respond strictly with a valid JSON object adhering to this exact schema:
 {
@@ -215,41 +218,27 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
                     original=p[:400] + "..." if len(p) > 400 else p
                 ))
 
-    # If document had no matching standard clause paragraphs, provide sample extracted clauses
+    # If document has no matching legal contract clauses (e.g. academic paper, abstract, or non-contract file)
     if not detected_clauses:
-        detected_clauses = [
-            ClauseAnalysis(
-                name="Uncapped Indemnification",
-                risk="High",
-                reason="The clause requires one party to hold harmless and indemnify against all loss without any financial cap.",
-                suggestion="Cap indemnity liability to 1x annual contract value and restrict scope to direct third-party breaches.",
-                original=paragraphs[0][:300] if paragraphs else "Client shall indemnify and defend Service Provider against any and all liabilities, losses, costs, or damages..."
-            ),
-            ClauseAnalysis(
-                name="Termination Terms",
-                risk="Medium",
-                reason="Requires only 5 days notice for termination for convenience, creating operational disruption.",
-                suggestion="Extend written notice period for termination without cause to 30 business days.",
-                original=paragraphs[min(1, len(paragraphs)-1)][:300] if paragraphs else "Either party may terminate this agreement at any time upon 5 days written notice..."
-            )
-        ]
-
-    # Calculate overall risk
-    high_count = sum(1 for c in detected_clauses if c.risk == "High")
-    med_count = sum(1 for c in detected_clauses if c.risk == "Medium")
-
-    if high_count >= 2:
-        overall = "High"
-    elif high_count == 1 or med_count >= 2:
-        overall = "Medium"
-    else:
         overall = "Low"
+        summary = "Document analysis complete. No high-risk or predatory legal contract clauses were identified in this document."
+    else:
+        # Calculate overall risk
+        high_count = sum(1 for c in detected_clauses if c.risk == "High")
+        med_count = sum(1 for c in detected_clauses if c.risk == "Medium")
 
-    summary = (
-        f"Contract analysis complete. Identified {len(detected_clauses)} critical clauses. "
-        f"The agreement presents an overall {overall} risk profile with {high_count} High-risk "
-        f"and {med_count} Medium-risk terms requiring legal review before signing."
-    )
+        if high_count >= 2:
+            overall = "High"
+        elif high_count == 1 or med_count >= 2:
+            overall = "Medium"
+        else:
+            overall = "Low"
+
+        summary = (
+            f"Contract analysis complete. Identified {len(detected_clauses)} critical clauses. "
+            f"The agreement presents an overall {overall} risk profile with {high_count} High-risk "
+            f"and {med_count} Medium-risk terms requiring legal review before signing."
+        )
 
     return ContractReport(
         summary=summary,
