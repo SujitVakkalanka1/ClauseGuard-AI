@@ -1,6 +1,8 @@
 import { AnalysisResponse, HistoryItemResponse, X402Requirements } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const cleanUrl = rawUrl.replace(/\/$/, '');
+const API_BASE_URL = cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
 
 export class X402PaymentError extends Error {
   x402: X402Requirements;
@@ -13,20 +15,29 @@ export class X402PaymentError extends Error {
 }
 
 export async function payChallenge(referenceId: string): Promise<{ txid: string; status: string }> {
-  const response = await fetch(`${API_BASE_URL}/pay-challenge`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ reference_id: referenceId }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/pay-challenge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reference_id: referenceId }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Failed to submit payment transaction to Algorand TestNet.');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to submit payment transaction to Algorand TestNet.');
+    }
+
+    return response.json();
+  } catch (err: any) {
+    if (err.name === 'TypeError' && err.message?.toLowerCase().includes('fetch')) {
+      throw new Error(
+        `Failed to reach backend API at ${API_BASE_URL}. Please verify your backend server is online and NEXT_PUBLIC_API_URL is set in Vercel.`
+      );
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export async function analyzeContract(file: File, paymentProofTxId?: string): Promise<AnalysisResponse> {
@@ -38,11 +49,21 @@ export async function analyzeContract(file: File, paymentProofTxId?: string): Pr
     headers['X-Payment-Proof'] = paymentProofTxId;
   }
 
-  const response = await fetch(`${API_BASE_URL}/analyze`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/analyze`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch (err: any) {
+    if (err.name === 'TypeError' && err.message?.toLowerCase().includes('fetch')) {
+      throw new Error(
+        `Failed to reach backend API at ${API_BASE_URL}. Please verify your backend server is online and NEXT_PUBLIC_API_URL is set in Vercel.`
+      );
+    }
+    throw err;
+  }
 
   if (response.status === 402) {
     const errorData = await response.json().catch(() => ({}));

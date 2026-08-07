@@ -5,8 +5,10 @@ import { AnalysisResponse } from './types';
  * with all original high & medium risk clauses replaced by safer reworded alternatives.
  */
 export function downloadEditedContractDocx(reportId: string | number, filename: string) {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const downloadUrl = `${backendUrl}/api/reports/${reportId}/download-edited`;
+  const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const cleanUrl = rawUrl.replace(/\/$/, '');
+  const baseUrl = cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  const downloadUrl = `${baseUrl}/reports/${reportId}/download-edited`;
   
   const link = document.createElement('a');
   link.href = downloadUrl;
