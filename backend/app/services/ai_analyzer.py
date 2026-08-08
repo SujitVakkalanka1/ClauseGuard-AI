@@ -19,6 +19,11 @@ Focus especially on high-risk categories:
 6. Non-Compete / Non-Solicit (overly broad scope, long duration, geographic limits)
 7. Arbitration & Governing Law (unfavorable jurisdiction, waiver of jury trial / class actions)
 
+CRITICAL INSTRUCTIONS FOR EXTRACTION & THE "original" FIELD:
+- "original": MUST contain ONLY the exact, substantive contract clause text directly stating the obligation extracted from the body of the document.
+- NEVER set "original" to a table of contents, document index, section outline, page header, or listing of chapter titles.
+- If a section header or number is near the clause, include only the sentence/paragraph containing the actual legal provision itself.
+
 NOTE FOR NON-CONTRACT DOCUMENTS:
 If the input text is an academic paper, project abstract, homework assignment, research report, resume, or non-contract document that does not contain legal contract clauses, you MUST:
 1. Return an empty array for "clauses": []
@@ -35,11 +40,10 @@ You MUST respond strictly with a valid JSON object adhering to this exact schema
       "risk": "High" | "Medium" | "Low",
       "reason": "Clear explanation of why this clause creates legal/financial risk",
       "suggestion": "Safer, reworded text for the clause that protects the client",
-      "original": "Exact original clause text from the contract"
+      "original": "Exact original substantive clause text from contract body (excluding table of contents or index lists)"
     }
   ]
 }
-
 Ensure:
 - 'overallRisk' is exactly one of: "High", "Medium", "Low"
 - 'risk' for each clause is exactly one of: "High", "Medium", "Low"
@@ -147,12 +151,26 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
     """
     High-fidelity heuristic analyzer for legal contracts.
     Detects key clause categories (Indemnity, Liability, Termination, Auto-Renewal, IP Assignment, Non-Compete, Arbitration).
+    Filters out Table of Contents and section index headers to ensure exact original clause text extraction.
     """
     detected_clauses = []
-    paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 30]
+    raw_paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 30]
 
-    if not paragraphs:
-        paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) > 30]
+    if not raw_paragraphs:
+        raw_paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) > 30]
+
+    # Helper to check if a paragraph is a Table of Contents or section index list
+    def is_toc_or_index(p: str) -> bool:
+        lower_p = p.lower()
+        if "table of contents" in lower_p or "index of sections" in lower_p or "sections" in lower_p and len(p) < 150:
+            return True
+        # If paragraph contains multiple section item listing lines (e.g. "23. ... 24. ... 25. ...")
+        num_listings = len(re.findall(r"\b\d{1,3}\.\s+[A-Z]", p))
+        if num_listings >= 2:
+            return True
+        return False
+
+    paragraphs = [p for p in raw_paragraphs if not is_toc_or_index(p)]
 
     # Pattern definitions
     patterns = [
@@ -212,14 +230,23 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
     for p in paragraphs:
         for pat in patterns:
             if pat["category"] not in found_categories and re.search(pat["regex"], p, re.IGNORECASE):
+                # Isolate exact sentence containing the match to avoid pulling adjacent section index text
+                sentences = re.split(r'(?<=[.!?])\s+', p)
+                matching_sentences = [s for s in sentences if re.search(pat["regex"], s, re.IGNORECASE)]
+                clause_text = " ".join(matching_sentences) if matching_sentences else p
+
+                if len(clause_text) > 400:
+                    clause_text = clause_text[:400] + "..."
+
                 found_categories.add(pat["category"])
                 detected_clauses.append(ClauseAnalysis(
                     name=pat["category"],
                     risk=pat["risk"],
                     reason=pat["reason"],
                     suggestion=pat["suggestion"],
-                    original=p[:400] + "..." if len(p) > 400 else p
+                    original=clause_text
                 ))
+
 
     # If document has no matching legal contract clauses (e.g. academic paper, abstract, or non-contract file)
     if not detected_clauses:
