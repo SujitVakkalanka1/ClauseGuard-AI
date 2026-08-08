@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 
 from app.database import get_db
-from app.schemas import AnalysisResponse, HistoryItemResponse, ClauseAnalysis
+from app.schemas import AnalysisResponse, HistoryItemResponse, ClauseAnalysis, UpdateClausesRequest
 from app.services.extraction import extract_text_from_file
 from app.services.ai_analyzer import analyze_contract_text
-from app.services.persistence import save_contract_analysis, get_report_by_id, get_all_reports_history
+from app.services.persistence import save_contract_analysis, get_report_by_id, get_all_reports_history, update_report_clauses
 from app.services.x402_gate import require_x402_payment
 from app.services.algorand_payment import submit_algorand_payment
 from app.services.document_editor import generate_edited_docx
@@ -180,3 +180,76 @@ def download_edited_contract_docx(report_id: int, db: Session = Depends(get_db))
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=download_filename
     )
+
+
+@router.put("/reports/{report_id}/clauses", response_model=AnalysisResponse)
+def update_clauses(report_id: int, payload: UpdateClausesRequest, db: Session = Depends(get_db)):
+    """
+    Updates the contract clause suggestions/amendments for a report in the database.
+    """
+    updated_report = update_report_clauses(db, report_id, payload.clauses)
+    if not updated_report:
+        raise HTTPException(status_code=404, detail=f"Report with ID {report_id} not found.")
+
+    clauses_response = [
+        ClauseAnalysis(
+            name=c.clause_name,
+            risk=c.risk,
+            reason=c.explanation,
+            suggestion=c.recommendation,
+            original=c.original_text
+        )
+        for c in updated_report.clauses
+    ]
+
+    payment_txid = None
+    if updated_report.contract and updated_report.contract.transactions:
+        payment_txid = updated_report.contract.transactions[0].algorand_txid
+
+    return AnalysisResponse(
+        id=updated_report.id,
+        contract_id=updated_report.contract_id,
+        filename=updated_report.contract.filename if updated_report.contract else "Contract",
+        upload_date=updated_report.contract.upload_date if updated_report.contract else updated_report.contract_id,
+        summary=updated_report.summary,
+        overallRisk=updated_report.overall_risk,
+        clauses=clauses_response,
+        payment_txid=payment_txid
+    )
+
+
+@router.post("/reports/{report_id}/download-amended")
+def download_custom_amended_docx(report_id: int, payload: UpdateClausesRequest, db: Session = Depends(get_db)):
+    """
+    Generates and downloads a custom Word (.docx) document using user-customized clause amendments.
+    """
+    db_report = get_report_by_id(db, report_id)
+    if not db_report:
+        raise HTTPException(status_code=404, detail=f"Report with ID {report_id} not found.")
+
+    # Update database first so edits persist
+    update_report_clauses(db, report_id, payload.clauses)
+
+    payment_txid = None
+    if db_report.contract and db_report.contract.transactions:
+        payment_txid = db_report.contract.transactions[0].algorand_txid
+
+    filename = db_report.contract.filename if db_report.contract else "Contract.docx"
+
+    file_path = generate_edited_docx(
+        filename=filename,
+        summary=db_report.summary,
+        overall_risk=db_report.overall_risk,
+        clauses=payload.clauses,
+        payment_txid=payment_txid
+    )
+
+    base_name = os.path.splitext(filename)[0]
+    download_filename = f"{base_name}_CUSTOM_AMENDED.docx"
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=download_filename
+    )
+

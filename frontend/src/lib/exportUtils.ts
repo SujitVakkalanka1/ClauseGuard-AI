@@ -20,6 +20,44 @@ export function downloadEditedContractDocx(reportId: string | number, filename: 
 }
 
 /**
+ * Sends custom amended clauses to backend and downloads the generated Word (.docx) document.
+ */
+export async function downloadCustomAmendedDocx(
+  reportId: string | number,
+  filename: string,
+  clauses: any[]
+) {
+  const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const cleanUrl = rawUrl.replace(/\/$/, '');
+  const baseUrl = cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  const downloadUrl = `${baseUrl}/reports/${reportId}/download-amended`;
+
+  const response = await fetch(downloadUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ clauses }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate customized contract document');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+  link.download = `${baseName}_CUSTOM_AMENDED.docx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+
+/**
  * Generates and downloads a complete Executive Risk Audit Report (.txt).
  */
 export function downloadExecutiveAuditReport(report: AnalysisResponse) {

@@ -19,8 +19,10 @@ import {
   Check,
   Download,
   FileCheck,
-  Sparkles
+  Sparkles,
+  Edit3
 } from 'lucide-react';
+
 
 export default function ResultsDashboardPage() {
   const params = useParams();
@@ -125,6 +127,16 @@ export default function ResultsDashboardPage() {
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           
+          {/* EDIT & AMEND CLAUSES BUTTON */}
+          <Link
+            href={`/amendments?reportId=${report.id}`}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#0A192F] hover:bg-[#112240] text-[#C5A059] border border-[#C5A059]/40 text-xs font-mono font-semibold transition-all shadow-md hover:scale-105"
+            title="Open interactive clause editor to edit and customize amendments"
+          >
+            <Edit3 size={14} className="text-[#C5A059]" />
+            <span>Edit & Amend Clauses</span>
+          </Link>
+
           {/* DOWNLOAD EDITED WORD CONTRACT BUTTON */}
           <button
             onClick={handleDownloadEdited}
@@ -143,6 +155,7 @@ export default function ResultsDashboardPage() {
               </>
             )}
           </button>
+
 
           {/* DOWNLOAD AUDIT REPORT BUTTON */}
           <button

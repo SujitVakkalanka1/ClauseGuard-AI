@@ -108,3 +108,34 @@ def get_all_reports_history(db: Session) -> List[schemas.HistoryItemResponse]:
         ))
 
     return history_list
+
+
+def update_report_clauses(db: Session, report_id: int, updated_clauses: List[schemas.ClauseAnalysis]) -> Optional[models.Report]:
+    """Updates clause recommendations and information for a specific report."""
+    report = get_report_by_id(db, report_id)
+    if not report:
+        return None
+
+    existing_by_name = {c.clause_name: c for c in report.clauses}
+    for item in updated_clauses:
+        if item.name in existing_by_name:
+            existing_clause = existing_by_name[item.name]
+            existing_clause.recommendation = item.suggestion
+            existing_clause.explanation = item.reason
+            existing_clause.risk = item.risk
+            existing_clause.original_text = item.original
+        else:
+            new_clause = models.Clause(
+                report_id=report.id,
+                clause_name=item.name,
+                original_text=item.original,
+                risk=item.risk,
+                explanation=item.reason,
+                recommendation=item.suggestion
+            )
+            db.add(new_clause)
+
+    db.commit()
+    db.refresh(report)
+    return report
+

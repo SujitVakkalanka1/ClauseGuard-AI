@@ -116,3 +116,24 @@ export async function fetchReportDetails(id: string | number): Promise<AnalysisR
 
   return response.json();
 }
+
+export async function updateReportClauses(
+  id: string | number,
+  clauses: any[]
+): Promise<AnalysisResponse> {
+  const response = await fetch(`${API_BASE_URL}/reports/${id}/clauses`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ clauses }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to update report clauses');
+  }
+
+  return response.json();
+}
+

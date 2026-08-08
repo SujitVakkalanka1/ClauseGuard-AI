@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, History } from 'lucide-react';
+import { ArrowRight, History, Edit3 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
-  const [activeSection, setActiveSection] = useState<'overview' | 'workflow' | 'history' | 'upload' | 'other'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'workflow' | 'amendments' | 'history' | 'upload' | 'other'>('overview');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,6 +27,8 @@ export const Navbar: React.FC = () => {
         } else {
           setActiveSection('overview');
         }
+      } else if (pathname === '/amendments') {
+        setActiveSection('amendments');
       } else if (pathname === '/history') {
         setActiveSection('history');
       } else if (pathname === '/upload') {
@@ -93,6 +95,22 @@ export const Navbar: React.FC = () => {
             <span>Workflow</span>
           </Link>
 
+          {/* Amendments Link */}
+          <Link
+            href="/amendments"
+            className={`transition-all duration-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5 ${
+              activeSection === 'amendments'
+                ? 'bg-[#C5A059]/20 text-[#C5A059] px-3.5 py-1.5 rounded-full border border-[#C5A059]/40 shadow-[0_0_12px_rgba(197,160,89,0.35)]'
+                : 'text-slate-300 hover:text-white px-2 py-1'
+            }`}
+          >
+            <Edit3 size={14} className={activeSection === 'amendments' ? 'text-[#C5A059]' : 'text-slate-400'} />
+            {activeSection === 'amendments' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-pulse" />
+            )}
+            <span>Amendments</span>
+          </Link>
+
           {/* History Link */}
           <Link
             href="/history"
@@ -108,6 +126,7 @@ export const Navbar: React.FC = () => {
             )}
             <span>History</span>
           </Link>
+
 
           {/* x402 TestNet Status Pill */}
           <span className="inline-flex items-center gap-1.5 text-xs font-mono bg-[#112240] text-slate-200 px-3 py-1 rounded-full border border-[#C5A059]/20 shadow-inner ml-2">
