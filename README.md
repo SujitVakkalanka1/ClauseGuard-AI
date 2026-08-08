@@ -233,8 +233,7 @@ Refer to [DEPLOYMENT.md](file:///c:/Users/vsbsu/Documents/Hackathon/DEPLOYMENT.m
 
 ## 👥 Team
 
-Built with ❤️ for the Hackathon by **Team Morgan**:
-- **Team Morgan**
+Built with ❤️ for the Hackathon by **Team Morgan**.
 
 ---
 
