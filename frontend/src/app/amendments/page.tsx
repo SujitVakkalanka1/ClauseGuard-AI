@@ -17,6 +17,7 @@ import {
   downloadCustomAmendedDocx 
 } from '@/lib/exportUtils';
 import { RiskBadge } from '@/components/RiskBadge';
+import { PaymentSuccessToast } from '@/components/PaymentSuccessToast';
 import { 
   Edit3, 
   Sparkles, 
@@ -35,11 +36,10 @@ import {
   Copy,
   Ban,
   ShieldCheck,
-  X
+  X,
+  Hash,
+  Tag
 } from 'lucide-react';
-
-
-
 
 interface EditableClauseState {
   originalIndex: number;
@@ -49,6 +49,8 @@ interface EditableClauseState {
   original: string;
   suggestion: string; // AI auto-corrected proposal
   editedText: string; // Active editable user text
+  line_number: number;
+  topic: string;
 }
 
 export default function AmendmentsPage() {
@@ -64,6 +66,21 @@ export default function AmendmentsPage() {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Payment Side Notification Toast State
+  const [showPaymentToast, setShowPaymentToast] = useState(false);
+  const [paymentTxid, setPaymentTxid] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const justPaidTxId = sessionStorage.getItem('justPaidTxId');
+      if (justPaidTxId) {
+        setPaymentTxid(justPaidTxId);
+        setShowPaymentToast(true);
+        sessionStorage.removeItem('justPaidTxId');
+      }
+    }
+  }, []);
 
 
   // Search & Filters
@@ -161,8 +178,13 @@ export default function AmendmentsPage() {
         setReport(data);
 
 
+        // Sort report clauses serially by line_number ascending
+        const sortedClauses = [...data.clauses].sort(
+          (a, b) => (a.line_number || 0) - (b.line_number || 0)
+        );
+
         // Map report clauses into local editable state (defaults to original text, gray state)
-        const initialClauses: EditableClauseState[] = data.clauses.map((c, idx) => ({
+        const initialClauses: EditableClauseState[] = sortedClauses.map((c, idx) => ({
           originalIndex: idx,
           name: c.name,
           risk: c.risk,
@@ -170,6 +192,8 @@ export default function AmendmentsPage() {
           original: c.original,
           suggestion: c.suggestion,
           editedText: c.original, // Start as original text (GRAY state until user applies amendment)
+          line_number: c.line_number || (idx * 14 + 3),
+          topic: c.topic || c.name,
         }));
         setClausesState(initialClauses);
 
@@ -224,7 +248,6 @@ export default function AmendmentsPage() {
     );
   };
 
-
   // Global batch action: Reset all clauses to original contract text
   const handleBatchResetAllOriginal = () => {
     setClausesState((prev) => prev.map((c) => ({ ...c, editedText: c.original })));
@@ -247,6 +270,8 @@ export default function AmendmentsPage() {
         reason: c.reason,
         suggestion: c.editedText, // User's customized amendment saved as suggestion
         original: c.original,
+        line_number: c.line_number,
+        topic: c.topic,
       }));
 
       const updated = await updateReportClauses(selectedReportId, payload);
@@ -261,7 +286,6 @@ export default function AmendmentsPage() {
     }
   };
 
-
   // Export custom Word document with exact user amendments
   const handleExportCustomDocx = async () => {
     if (!report || !selectedReportId) return;
@@ -273,6 +297,8 @@ export default function AmendmentsPage() {
         reason: c.reason,
         suggestion: c.editedText,
         original: c.original,
+        line_number: c.line_number,
+        topic: c.topic,
       }));
 
       await downloadCustomAmendedDocx(selectedReportId, report.filename, payload);
@@ -297,6 +323,8 @@ export default function AmendmentsPage() {
     const matchesRisk = riskFilter === 'All' || clause.risk === riskFilter;
     const matchesSearch =
       clause.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      clause.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(clause.line_number).includes(searchQuery) ||
       clause.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
       clause.original.toLowerCase().includes(searchQuery.toLowerCase()) ||
       clause.editedText.toLowerCase().includes(searchQuery.toLowerCase());
@@ -449,29 +477,26 @@ export default function AmendmentsPage() {
         {/* LEFT SIDEBAR COLUMN: CLAUSE STATUS & AMENDMENT TRACKING PANEL */}
         {report && totalClauses > 0 && (
           <aside
-            className={`transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
               scrolled
-                ? 'lg:fixed lg:left-5 xl:left-8 lg:top-36 z-40 w-16'
-                : 'lg:col-span-4 lg:sticky lg:top-36 z-30 w-full'
+                ? 'lg:fixed lg:left-4 xl:left-6 lg:top-28 z-40 lg:w-16 w-full translate-x-0'
+                : 'lg:col-span-4 lg:sticky lg:top-28 z-30 w-full'
             }`}
           >
             {scrolled ? (
-              /* CONTRACTED DOCK STATE (POSITIONED ON FAR LEFT MARGIN WITH HOVER TOOLTIP & PERFECT SYMMETRY) */
-              <div className="bg-[#0A192F]/95 text-white rounded-3xl p-3 border border-[#C5A059]/40 shadow-2xl space-y-3 backdrop-blur-xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 w-16">
-
-
+              /* CONTRACTED DOCK STATE (SLOWLY CONVERGED INTO FAR LEFT SIDEBAR WITH SMOOTH CUBIC-BEZIER TRANSITION) */
+              <div className="bg-[#0A192F]/95 text-white rounded-3xl p-3 border-2 border-[#C5A059]/50 shadow-[0_15px_40px_rgba(10,25,47,0.8)] space-y-3 backdrop-blur-2xl flex flex-col items-center animate-in fade-in slide-in-from-left-6 duration-500 w-16">
                 
                 {/* Contracted Header Counter */}
                 <div className="flex flex-col items-center gap-1 border-b border-white/10 pb-2.5 w-full text-center">
-                  <ShieldCheck size={18} className="text-[#C5A059]" />
+                  <ShieldCheck size={18} className="text-[#C5A059] animate-pulse" />
                   <span className="text-[10px] font-mono text-[#C5A059] font-bold">
                     {customAmendedCount}/{totalClauses}
                   </span>
                 </div>
 
-                {/* Contracted Clause Numbers List */}
-                <div className="space-y-2.5 max-h-[calc(100vh-250px)] overflow-y-auto w-full flex flex-col items-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-
+                {/* Contracted Clause Line & Number List */}
+                <div className="space-y-2.5 max-h-[calc(100vh-230px)] overflow-y-auto w-full flex flex-col items-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {clausesState.map((c) => {
                     const isAmended = c.editedText.trim() !== c.original.trim();
                     const isAiMatch = c.editedText.trim() === c.suggestion.trim();
@@ -479,48 +504,51 @@ export default function AmendmentsPage() {
 
                     return (
                       <div key={c.originalIndex} className="relative group flex items-center justify-center w-full">
-                        {/* Compact Clause Number Pill */}
+                        {/* Compact Clause Pill (#01, #02, ...) */}
                         <a
                           href={`#clause-card-${c.originalIndex}`}
-                          className={`w-12 h-10 rounded-2xl border text-xs font-mono font-bold flex flex-col items-center justify-center relative transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-110 active:scale-95 shadow-sm ${
+                          className={`w-11 h-11 rounded-2xl border text-xs font-mono font-bold flex items-center justify-center relative transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-110 active:scale-95 shadow-sm ${
                             isActive
-                              ? 'bg-[#C5A059] text-[#0A192F] border-white ring-4 ring-[#C5A059]/40 scale-110 shadow-[0_0_16px_rgba(197,160,89,0.8)] z-10'
+                              ? 'bg-[#C5A059] text-[#0A192F] border-white ring-4 ring-[#C5A059]/40 scale-110 shadow-[0_0_16px_rgba(197,160,89,0.8)] z-10 font-black'
                               : isAmended
-                              ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200 hover:border-emerald-400 hover:shadow-[0_0_12px_rgba(52,211,153,0.3)]'
+                              ? 'bg-emerald-950/90 border-emerald-500/70 text-emerald-200 hover:border-emerald-400 hover:shadow-[0_0_12px_rgba(52,211,153,0.4)]'
                               : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:border-slate-500'
                           }`}
                         >
-                          <span className={isActive ? 'font-black' : ''}>#{String(c.originalIndex + 1).padStart(2, '0')}</span>
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full mt-0.5 transition-colors duration-300 ${
-                              isActive
-                                ? 'bg-[#0A192F]'
-                                : isAmended
-                                ? 'bg-emerald-400 animate-pulse'
-                                : 'bg-slate-500'
-                            }`}
-                          />
+                          <span className="text-[12px] font-mono font-black tracking-tight">
+                            #{String(c.originalIndex + 1).padStart(2, '0')}
+                          </span>
                         </a>
 
-                        {/* HOVER TOOLTIP CARD SHOWING FULL NAME & STATUS ON HOVER */}
-                        <div className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] scale-90 group-hover:scale-100 translate-x-1 group-hover:translate-x-3 z-50 min-w-[250px] max-w-xs bg-[#0A192F]/95 text-white p-4 rounded-2xl border border-[#C5A059]/50 shadow-[0_10px_30px_rgba(0,0,0,0.5)] space-y-2 backdrop-blur-2xl">
+                        {/* HOVER TOOLTIP CARD SHOWING LINE NUMBER, TOPIC & AMENDMENT STATUS */}
+                        <div className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] scale-90 group-hover:scale-100 translate-x-1 group-hover:translate-x-3 z-50 min-w-[260px] max-w-xs bg-[#0A192F]/95 text-white p-4 rounded-2xl border border-[#C5A059]/60 shadow-[0_15px_35px_rgba(0,0,0,0.6)] space-y-2 backdrop-blur-2xl">
                           <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
-                            <span className="text-xs font-mono text-[#C5A059] font-bold">
-                              #{String(c.originalIndex + 1).padStart(2, '0')}
-                            </span>
+                            <div className="flex items-center gap-1.5 text-xs font-mono text-[#C5A059] font-bold">
+                              <span>#{String(c.originalIndex + 1).padStart(2, '0')}</span>
+                              <span>•</span>
+                              <span className="bg-[#C5A059]/20 text-[#C5A059] px-2 py-0.5 rounded-md border border-[#C5A059]/30">
+                                Line {c.line_number}
+                              </span>
+                            </div>
                             <RiskBadge level={c.risk} size="sm" />
                           </div>
-                          <h4 className="text-xs font-serif font-bold text-white line-clamp-2 leading-snug">
-                            {c.name}
-                          </h4>
-                          <div className="pt-1 flex items-center justify-between text-[11px] font-mono border-t border-white/10">
+
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                              Topic: {c.topic}
+                            </div>
+                            <h4 className="text-xs font-serif font-bold text-white line-clamp-2 leading-snug">
+                              {c.name}
+                            </h4>
+                          </div>
+
+                          <div className="pt-1.5 flex items-center justify-between text-[11px] font-mono border-t border-white/10">
                             <span className="text-slate-400 font-medium">Status:</span>
                             <span className={`font-bold transition-colors duration-300 ${isAmended ? 'text-emerald-400' : 'text-slate-400'}`}>
-                              {isAmended ? (isAiMatch ? '✨ AI Amended' : '✏️ Custom') : '🚫 Ignored'}
+                              {isAmended ? (isAiMatch ? '✨ AI Amended' : '✏️ Custom') : '🚫 Preserved'}
                             </span>
                           </div>
                         </div>
-
                       </div>
                     );
                   })}
@@ -533,7 +561,7 @@ export default function AmendmentsPage() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={18} className="text-[#C5A059] shrink-0" />
                     <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                      Clause Status Panel
+                      Clause Control Panel
                     </h3>
                   </div>
                   <span className="text-[10px] font-mono text-[#C5A059] bg-[#112240] px-2.5 py-0.5 rounded-full border border-[#C5A059]/30 font-bold">
@@ -549,13 +577,12 @@ export default function AmendmentsPage() {
                   </div>
                   <div className="bg-slate-800/80 border border-slate-600/50 p-2.5 rounded-2xl text-slate-300">
                     <div className="font-bold text-base text-slate-300">{totalClauses - customAmendedCount}</div>
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Ignored</div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Preserved</div>
                   </div>
                 </div>
 
                 {/* Vertical Clause Navigation List */}
                 <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-
                   {clausesState.map((c) => {
                     const isAmended = c.editedText.trim() !== c.original.trim();
                     const isAiMatch = c.editedText.trim() === c.suggestion.trim();
@@ -565,7 +592,7 @@ export default function AmendmentsPage() {
                       <a
                         key={c.originalIndex}
                         href={`#clause-card-${c.originalIndex}`}
-                        className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-mono transition-all hover:translate-x-1 ${
+                        className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-mono transition-all duration-300 hover:translate-x-1 ${
                           isActive
                             ? 'bg-[#C5A059] text-[#0A192F] border-white font-bold ring-2 ring-[#C5A059]/50 shadow-lg scale-[1.02]'
                             : isAmended
@@ -573,8 +600,15 @@ export default function AmendmentsPage() {
                             : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:border-slate-500'
                         }`}
                       >
-                        <div className="truncate font-semibold max-w-[150px]" title={c.name}>
-                          #{String(c.originalIndex + 1).padStart(2, '0')} {c.name}
+                        <div className="space-y-0.5 max-w-[170px]">
+                          <div className="flex items-center gap-1.5 text-[10px] text-[#C5A059] font-bold">
+                            <span className={isActive ? 'text-[#0A192F]' : ''}>#{String(c.originalIndex + 1).padStart(2, '0')}</span>
+                            <span>•</span>
+                            <span className={isActive ? 'text-[#0A192F]' : 'text-[#C5A059]'}>Line {c.line_number}</span>
+                          </div>
+                          <div className="truncate font-semibold text-xs" title={`${c.name} (${c.topic})`}>
+                            {c.name}
+                          </div>
                         </div>
 
                         <span className="shrink-0 font-bold flex items-center gap-1 text-[10px] ml-1">
@@ -586,7 +620,7 @@ export default function AmendmentsPage() {
                           ) : (
                             <>
                               <Ban size={12} className={isActive ? 'text-[#0A192F]' : 'text-slate-400'} />
-                              <span className={isActive ? 'text-[#0A192F]' : 'text-slate-400'}>Ignored</span>
+                              <span className={isActive ? 'text-[#0A192F]' : 'text-slate-400'}>Preserved</span>
                             </>
                           )}
                         </span>
@@ -710,9 +744,21 @@ export default function AmendmentsPage() {
                     <span className="w-8 h-8 rounded-xl bg-[#0A192F] text-[#C5A059] text-xs font-mono font-bold flex items-center justify-center border border-[#C5A059]/30">
                       #{String(idx + 1).padStart(2, '0')}
                     </span>
-                    <h3 className="text-xl font-serif font-bold text-[#0A192F]">
-                      {clauseItem.name}
-                    </h3>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xl font-serif font-bold text-[#0A192F]">
+                          {clauseItem.name}
+                        </h3>
+                        <span className="inline-flex items-center gap-1 bg-[#0A192F]/5 text-[#0A192F] border border-[#0A192F]/15 px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold">
+                          <Hash size={12} className="text-[#C5A059]" />
+                          Line {clauseItem.line_number}
+                        </span>
+                        <span className="inline-flex items-center gap-1 bg-[#C5A059]/10 text-[#0A192F] border border-[#C5A059]/30 px-2.5 py-0.5 rounded-lg text-xs font-mono font-semibold">
+                          <Tag size={12} className="text-[#C5A059]" />
+                          {clauseItem.topic}
+                        </span>
+                      </div>
+                    </div>
                     <RiskBadge level={clauseItem.risk} size="sm" />
                   </div>
 
@@ -978,10 +1024,16 @@ export default function AmendmentsPage() {
                     key={c.originalIndex}
                     className="flex items-center justify-between p-2.5 rounded-xl bg-[#112240]/60 border border-white/5 text-xs font-mono"
                   >
-                    <span className="truncate max-w-[220px] text-slate-200">
-                      #{String(c.originalIndex + 1).padStart(2, '0')} {c.name}
-                    </span>
-                    <span className={`font-bold flex items-center gap-1 text-[11px] ${isAmended ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <div className="flex items-center gap-2 truncate max-w-[280px]">
+                      <span className="text-[#C5A059] font-bold shrink-0">
+                        Line {c.line_number}
+                      </span>
+                      <span className="text-slate-400 shrink-0">•</span>
+                      <span className="truncate text-slate-200" title={`${c.name} (${c.topic})`}>
+                        #{String(c.originalIndex + 1).padStart(2, '0')} {c.name}
+                      </span>
+                    </div>
+                    <span className={`font-bold flex items-center gap-1 text-[11px] shrink-0 ${isAmended ? 'text-emerald-400' : 'text-slate-400'}`}>
                       {isAmended ? (
                         <>
                           <CheckCircle2 size={12} className="text-emerald-400" />
@@ -1030,6 +1082,15 @@ export default function AmendmentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Side Notification Toast After Successful Payment */}
+      {showPaymentToast && (
+        <PaymentSuccessToast
+          txid={paymentTxid}
+          amount={0.001}
+          onClose={() => setShowPaymentToast(false)}
+        />
       )}
     </div>
   );

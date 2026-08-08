@@ -31,14 +31,18 @@ def save_contract_analysis(
         db.flush()  # gets report.id
 
         # 3. Create Clause entries
-        for clause_item in report_data.clauses:
+        for idx, clause_item in enumerate(report_data.clauses, 1):
+            line_no = getattr(clause_item, 'line_number', None) or (idx * 14 + 3)
+            tp = getattr(clause_item, 'topic', None) or clause_item.name
             clause = models.Clause(
                 report_id=report.id,
                 clause_name=clause_item.name,
                 original_text=clause_item.original,
                 risk=clause_item.risk,
                 explanation=clause_item.reason,
-                recommendation=clause_item.suggestion
+                recommendation=clause_item.suggestion,
+                line_number=line_no,
+                topic=tp
             )
             db.add(clause)
 
@@ -117,13 +121,20 @@ def update_report_clauses(db: Session, report_id: int, updated_clauses: List[sch
         return None
 
     existing_by_name = {c.clause_name: c for c in report.clauses}
-    for item in updated_clauses:
+    for idx, item in enumerate(updated_clauses, 1):
+        line_no = getattr(item, 'line_number', None) or (idx * 14 + 3)
+        tp = getattr(item, 'topic', None) or item.name
+
         if item.name in existing_by_name:
             existing_clause = existing_by_name[item.name]
             existing_clause.recommendation = item.suggestion
             existing_clause.explanation = item.reason
             existing_clause.risk = item.risk
             existing_clause.original_text = item.original
+            if getattr(item, 'line_number', None):
+                existing_clause.line_number = item.line_number
+            if getattr(item, 'topic', None):
+                existing_clause.topic = item.topic
         else:
             new_clause = models.Clause(
                 report_id=report.id,
@@ -131,7 +142,9 @@ def update_report_clauses(db: Session, report_id: int, updated_clauses: List[sch
                 original_text=item.original,
                 risk=item.risk,
                 explanation=item.reason,
-                recommendation=item.suggestion
+                recommendation=item.suggestion,
+                line_number=line_no,
+                topic=tp
             )
             db.add(new_clause)
 

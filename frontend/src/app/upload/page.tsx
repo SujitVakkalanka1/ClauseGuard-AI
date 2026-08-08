@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { ProcessingProgress } from '@/components/ProcessingProgress';
 import { PaymentModal } from '@/components/PaymentModal';
+import { PaymentSuccessToast } from '@/components/PaymentSuccessToast';
 import { analyzeContract, payChallenge, X402PaymentError } from '@/lib/api';
 import { X402Requirements } from '@/lib/types';
 import { AlertCircle } from 'lucide-react';
@@ -20,6 +21,10 @@ export default function UploadPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentReqs, setPaymentReqs] = useState<X402Requirements | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  // Payment Success Side Notification Toast State
+  const [showPaymentToast, setShowPaymentToast] = useState(false);
+  const [confirmedTxid, setConfirmedTxid] = useState<string>('');
 
   const startAnalysis = async (file: File, proofTxId?: string) => {
     setIsProcessing(true);
@@ -72,6 +77,15 @@ export default function UploadPage() {
       
       setShowPaymentModal(false);
       setIsPayingOnChain(false);
+
+      // Trigger Side Toast Notification for Payment Success!
+      if (payResult?.txid) {
+        setConfirmedTxid(payResult.txid);
+        setShowPaymentToast(true);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('justPaidTxId', payResult.txid);
+        }
+      }
 
       // Retry analyze call passing the confirmed real Algorand transaction ID
       startAnalysis(pendingFile, payResult.txid);
@@ -132,6 +146,15 @@ export default function UploadPage() {
         onCancel={handleCancelPayment}
         isLoading={isPayingOnChain}
       />
+
+      {/* Side Notification Toast After Successful Payment */}
+      {showPaymentToast && (
+        <PaymentSuccessToast
+          txid={confirmedTxid}
+          amount={paymentReqs?.amount || 0.001}
+          onClose={() => setShowPaymentToast(false)}
+        />
+      )}
     </div>
   );
 }

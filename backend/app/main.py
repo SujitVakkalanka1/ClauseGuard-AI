@@ -4,8 +4,25 @@ from app.config import settings
 from app.database import engine, Base
 from app.api.routes import router as api_router
 
-# Ensure database tables are created on startup
+from sqlalchemy import text
+
+# Ensure database tables and new columns exist on startup
 Base.metadata.create_all(bind=engine)
+
+def ensure_columns_exist():
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE clauses ADD COLUMN line_number INTEGER;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE clauses ADD COLUMN topic VARCHAR(255);"))
+            conn.commit()
+        except Exception:
+            pass
+
+ensure_columns_exist()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

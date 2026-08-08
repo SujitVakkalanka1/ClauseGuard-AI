@@ -6,6 +6,8 @@ export interface ClauseAnalysis {
   reason: string;
   suggestion: string;
   original: string;
+  line_number?: number;
+  topic?: string;
 }
 
 export interface AnalysisResponse {

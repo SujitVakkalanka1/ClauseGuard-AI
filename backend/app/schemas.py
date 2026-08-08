@@ -9,6 +9,9 @@ class ClauseAnalysis(BaseModel):
     reason: str = Field(description="Detailed explanation of why this clause is risky")
     suggestion: str = Field(description="Safer, reworded text suggestion for the clause")
     original: str = Field(description="Exact original clause text extracted from document")
+    line_number: Optional[int] = Field(default=None, description="Line number of clause in source document")
+    topic: Optional[str] = Field(default=None, description="Topic section or category of the clause")
+
 
 # Full Contract Analysis Report Schema (matches required LLM shape)
 class ContractReport(BaseModel):

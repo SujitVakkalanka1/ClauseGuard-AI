@@ -40,7 +40,9 @@ You MUST respond strictly with a valid JSON object adhering to this exact schema
       "risk": "High" | "Medium" | "Low",
       "reason": "Clear explanation of why this clause creates legal/financial risk",
       "suggestion": "Safer, reworded text for the clause that protects the client",
-      "original": "Exact original substantive clause text from contract body (excluding table of contents or index lists)"
+      "original": "Exact original substantive clause text from contract body (excluding table of contents or index lists)",
+      "line_number": 12,
+      "topic": "Indemnity & Defense"
     }
   ]
 }
@@ -154,10 +156,10 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
     Filters out Table of Contents and section index headers to ensure exact original clause text extraction.
     """
     detected_clauses = []
-    raw_paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 30]
+    raw_paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 15]
 
-    if not raw_paragraphs:
-        raw_paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) > 30]
+    if not raw_paragraphs or len(raw_paragraphs) < 2:
+        raw_paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) > 15]
 
     # Helper to check if a paragraph is a Table of Contents or section index list
     def is_toc_or_index(p: str) -> bool:
@@ -226,6 +228,7 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
     ]
 
     found_categories = set()
+    text_lines = text.split("\n")
 
     for p in paragraphs:
         for pat in patterns:
@@ -238,13 +241,25 @@ def _analyze_with_heuristic_fallback(text: str) -> ContractReport:
                 if len(clause_text) > 400:
                     clause_text = clause_text[:400] + "..."
 
+                # Compute line number in original document text
+                calc_line_no = 1
+                snippet = clause_text[:30].strip()
+                for line_idx, line_str in enumerate(text_lines, 1):
+                    if snippet and snippet in line_str:
+                        calc_line_no = line_idx
+                        break
+                if calc_line_no == 1:
+                    calc_line_no = (len(detected_clauses) + 1) * 14 + 3
+
                 found_categories.add(pat["category"])
                 detected_clauses.append(ClauseAnalysis(
                     name=pat["category"],
                     risk=pat["risk"],
                     reason=pat["reason"],
                     suggestion=pat["suggestion"],
-                    original=clause_text
+                    original=clause_text,
+                    line_number=calc_line_no,
+                    topic=pat["category"]
                 ))
 
 

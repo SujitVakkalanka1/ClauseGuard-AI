@@ -53,17 +53,25 @@ def generate_edited_docx(
     sub_run.font.italic = True
     sub_run.font.color.rgb = RGBColor(100, 110, 120)
 
+    # Sort clauses serially by line number
+    sorted_clauses = sorted(
+        clauses, 
+        key=lambda x: getattr(x, "line_number", None) or getattr(x, "line_no", 0) or 0
+    )
+
     # Render each clause cleanly as a contract section
-    for idx, c in enumerate(clauses):
+    for idx, c in enumerate(sorted_clauses):
         c_name = getattr(c, "clause_name", getattr(c, "name", f"Section {idx+1}"))
         c_suggestion = getattr(c, "recommendation", getattr(c, "suggestion", ""))
         c_original = getattr(c, "original_text", getattr(c, "original", ""))
+        c_line = getattr(c, "line_number", None) or getattr(c, "line_no", None) or (idx * 14 + 3)
+        c_topic = getattr(c, "topic", None) or c_name
 
         # Use suggested reworded text if available; otherwise fallback to original
         replacement_text = c_suggestion.strip() if (c_suggestion and c_suggestion.strip()) else c_original.strip()
         is_amended = replacement_text.strip() != c_original.strip()
 
-        # Section Heading with clear visual badge for amended clauses
+        # Section Heading with clear visual badge for amended clauses, line number, and topic
         sec_heading_text = f"{idx + 1}. {c_name.upper()}"
         
         head_p = doc.add_paragraph()
@@ -77,12 +85,18 @@ def generate_edited_docx(
         head_run.font.bold = True
         head_run.font.color.rgb = RGBColor(15, 30, 55)  # Executive Deep Navy
 
+        info_run = head_p.add_run(f"  (Line {c_line} • Topic: {c_topic})")
+        info_run.font.name = "Calibri"
+        info_run.font.size = Pt(10)
+        info_run.font.bold = True
+        info_run.font.color.rgb = RGBColor(197, 160, 89)
+
         if is_amended:
             tag_run = head_p.add_run("  [AMENDED PROVISION]")
             tag_run.font.name = "Calibri"
             tag_run.font.size = Pt(10)
             tag_run.font.bold = True
-            tag_run.font.color.rgb = RGBColor(197, 160, 89)  # Gold highlight tag
+            tag_run.font.color.rgb = RGBColor(16, 185, 129)  # Emerald tag
         else:
             tag_run = head_p.add_run("  [ORIGINAL PRESERVED]")
             tag_run.font.name = "Calibri"

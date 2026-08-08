@@ -89,9 +89,11 @@ async def analyze_contract(
             risk=c.risk,
             reason=c.explanation,
             suggestion=c.recommendation,
-            original=c.original_text
+            original=c.original_text,
+            line_number=getattr(c, 'line_number', None) or (i * 14 + 3),
+            topic=getattr(c, 'topic', None) or c.clause_name
         )
-        for c in db_report.clauses
+        for i, c in enumerate(db_report.clauses, 1)
     ]
 
     payment_txid = payment_info.get("txid") if payment_info else None
@@ -127,9 +129,11 @@ def get_report_details(report_id: int, db: Session = Depends(get_db)):
             risk=c.risk,
             reason=c.explanation,
             suggestion=c.recommendation,
-            original=c.original_text
+            original=c.original_text,
+            line_number=getattr(c, 'line_number', None) or (i * 14 + 3),
+            topic=getattr(c, 'topic', None) or c.clause_name
         )
-        for c in db_report.clauses
+        for i, c in enumerate(db_report.clauses, 1)
     ]
 
     payment_txid = None

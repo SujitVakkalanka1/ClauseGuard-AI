@@ -36,6 +36,8 @@ class Clause(Base):
     risk = Column(String(50), nullable=False)  # High | Medium | Low
     explanation = Column(Text, nullable=False)
     recommendation = Column(Text, nullable=False)
+    line_number = Column(Integer, nullable=True, default=1)
+    topic = Column(String(255), nullable=True)
 
     report = relationship("Report", back_populates="clauses")
 
