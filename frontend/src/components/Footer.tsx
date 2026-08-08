@@ -1,7 +1,20 @@
-import React from 'react';
-import { ExternalLink } from 'lucide-react';
+'use client';
+
+import React, { useState } from 'react';
+import { ExternalLink, Check, Copy } from 'lucide-react';
+
+
+const RECIPIENT_ADDRESS = 'ULDGSMHBVIIXNZO3W4H6GTHSYPCAFQ6SV5CWZGONABA22RLBLTI4LBFWAQ';
 
 export const Footer: React.FC = () => {
+  const [copied, setCopied] = useState(false);
+
+  const handleDispenserClick = () => {
+    navigator.clipboard.writeText(RECIPIENT_ADDRESS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
   return (
     <footer className="border-t border-[#0A192F]/10 bg-[#0A192F] text-white py-8 mt-auto relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
@@ -27,16 +40,19 @@ export const Footer: React.FC = () => {
           </a>
           <span>•</span>
           <a 
-            href="https://lora.algokit.io/testnet/fund" 
+            href={`https://lora.algokit.io/testnet/fund?address=${RECIPIENT_ADDRESS}`}
             target="_blank" 
             rel="noopener noreferrer" 
-            className="flex items-center gap-1 hover:text-[#C5A059] transition-colors"
+            onClick={handleDispenserClick}
+            className="flex items-center gap-1 hover:text-[#C5A059] transition-colors text-[#C5A059] font-bold"
+            title="Click to open Algorand TestNet Dispenser pre-filled with Receiver Wallet Address"
           >
-            <span>TestNet Dispenser</span>
-            <ExternalLink size={12} />
+            <span>{copied ? 'Receiver Address Copied!' : 'TestNet Dispenser'}</span>
+            {copied ? <Check size={12} className="text-emerald-400" /> : <ExternalLink size={12} />}
           </a>
         </div>
       </div>
     </footer>
   );
 };
+

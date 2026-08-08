@@ -1,5 +1,7 @@
-import React from 'react';
-import { ShieldCheck, ArrowRight, Lock, Loader2, Coins } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, ArrowRight, Lock, Loader2, Coins, Copy, Check, ExternalLink } from 'lucide-react';
+
+const RECIPIENT_ADDRESS = 'ULDGSMHBVIIXNZO3W4H6GTHSYPCAFQ6SV5CWZGONABA22RLBLTI4LBFWAQ';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -18,7 +20,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onCancel,
   isLoading = false,
 }) => {
+  const [copied, setCopied] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleCopyAddress = () => {
+    navigator.clipboard.writeText(RECIPIENT_ADDRESS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A192F]/80 backdrop-blur-xl animate-in fade-in duration-200">
@@ -54,14 +64,47 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <span className="text-[#C5A059] font-mono text-xs font-semibold">Algorand TestNet</span>
           </div>
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between">
             <span className="text-slate-200 font-bold text-sm">Total Required:</span>
             <div className="text-right">
               <span className="text-2xl font-black text-[#C5A059] font-mono">{amount} {asset}</span>
               <span className="text-[10px] text-slate-400 font-mono block">Single Contract Scan</span>
             </div>
           </div>
+
+          {/* Receiver Wallet Address Display & Quick Dispenser Action */}
+          <div className="pt-3 border-t border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+              <span className="font-semibold text-slate-200">Receiver Address:</span>
+              <button
+                type="button"
+                onClick={handleCopyAddress}
+                className="text-[#C5A059] hover:underline flex items-center gap-1 font-bold"
+                title="Copy receiver wallet address to clipboard"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                <span>{copied ? 'Copied!' : 'Copy Address'}</span>
+              </button>
+            </div>
+            <div className="font-mono text-[11px] text-slate-300 bg-[#0A192F] p-2 rounded-xl border border-white/10 break-all select-all font-semibold">
+              {RECIPIENT_ADDRESS}
+            </div>
+            <div className="text-right pt-0.5">
+              <a
+                href={`https://lora.algokit.io/testnet/fund?address=${RECIPIENT_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleCopyAddress}
+                className="text-[11px] font-mono text-[#C5A059] underline inline-flex items-center gap-1 hover:text-white font-bold"
+                title="Open Algorand TestNet Dispenser pre-filled with Receiver Wallet Address"
+              >
+                <span>Fund via TestNet Dispenser</span>
+                <ExternalLink size={11} />
+              </a>
+            </div>
+          </div>
         </div>
+
 
         {/* Feature Badges */}
         <div className="grid grid-cols-2 gap-3 text-xs text-slate-200 font-mono">
