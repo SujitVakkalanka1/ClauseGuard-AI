@@ -46,12 +46,13 @@ export const Navbar: React.FC = () => {
   return (
     <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none transition-all duration-500">
       <div
-        className={`floating-pill-nav flex items-center justify-between gap-4 sm:gap-6 pointer-events-auto w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`floating-pill-nav flex items-center justify-between gap-3 sm:gap-5 pointer-events-auto w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           scrolled
-            ? 'max-w-5xl sm:max-w-6xl rounded-2xl px-5 sm:px-7 py-2.5 bg-[#0A192F] text-[#F8F9FA] shadow-2xl shadow-[#0A192F]/40 border border-[#C5A059]/40 backdrop-blur-2xl'
-            : 'max-w-4xl sm:max-w-5xl rounded-full px-5 sm:px-6 py-2.5 bg-[#0A192F]/95 text-[#F8F9FA] shadow-xl border border-[#C5A059]/30 backdrop-blur-xl'
+            ? 'max-w-5xl lg:max-w-6xl rounded-2xl px-5 sm:px-7 py-2.5 bg-[#0A192F] text-[#F8F9FA] shadow-2xl shadow-[#0A192F]/40 border border-[#C5A059]/40 backdrop-blur-2xl'
+            : 'max-w-4xl lg:max-w-5xl rounded-full px-4 sm:px-6 py-2.5 bg-[#0A192F]/95 text-[#F8F9FA] shadow-xl border border-[#C5A059]/30 backdrop-blur-xl'
         }`}
       >
+
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#C5A059] to-[#D4AF37] flex items-center justify-center text-[#0A192F] font-bold text-sm shadow-md shadow-[#C5A059]/30 group-hover:scale-105 transition-transform duration-300">
