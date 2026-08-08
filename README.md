@@ -20,7 +20,6 @@ Developed by **Team Morgan** 🚀
 - [Environment Variables](#-environment-variables)
 - [API Endpoints](#-api-endpoints)
 - [Deployment Guide](#-deployment-guide)
-- [Team](#-team)
 - [License](#-license)
 
 ---
@@ -228,12 +227,6 @@ docker-compose up --build
 Refer to [DEPLOYMENT.md](file:///c:/Users/vsbsu/Documents/Hackathon/DEPLOYMENT.md) for step-by-step instructions on deploying:
 - **Backend** to **Render** via Blueprint (`render.yaml`).
 - **Frontend** to **Vercel**.
-
----
-
-## 👥 Team
-
-Built with ❤️ for the Hackathon by **Team Morgan**.
 
 ---
 
