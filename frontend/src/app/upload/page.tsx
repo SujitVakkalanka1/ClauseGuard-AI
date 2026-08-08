@@ -40,8 +40,9 @@ export default function UploadPage() {
 
       setTimeout(() => {
         clearInterval(interval);
-        router.push(`/results/${response.id}`);
+        router.push(`/amendments?reportId=${response.id}`);
       }, 800);
+
     } catch (err: any) {
       clearInterval(interval);
       setIsProcessing(false);
