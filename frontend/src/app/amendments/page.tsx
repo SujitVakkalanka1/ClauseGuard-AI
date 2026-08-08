@@ -344,72 +344,17 @@ export default function AmendmentsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 space-y-8 daylight-grid bg-[#F8F9FA] text-[#212529] min-h-screen">
       
       {/* Page Title & Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#C5A059] font-bold uppercase tracking-wider mb-1">
-            <Edit3 size={14} className="animate-pulse text-[#C5A059]" />
-            <span>Contract Amendment Studio</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#0A192F] tracking-tight">
-            Clause Amendments & Fine-Tuning
-          </h1>
-          <p className="text-slate-600 text-sm mt-1 max-w-2xl">
-            Review clause risk exposure, inspect AI auto-corrections, and manually edit or rewrite provisions to produce an execution-ready customized contract.
-          </p>
+      <div>
+        <div className="flex items-center gap-2 text-xs font-mono text-[#C5A059] font-bold uppercase tracking-wider mb-1">
+          <Edit3 size={14} className="animate-pulse text-[#C5A059]" />
+          <span>Contract Amendment Studio</span>
         </div>
-
-        {/* Action Header Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          {report && (
-            <Link
-              href={`/results/${report.id}`}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#0A192F]/15 hover:bg-[#F4F5F7] text-[#0A192F] text-xs font-mono font-semibold transition-colors shadow-sm"
-            >
-              <ArrowLeft size={14} />
-              <span>Back to Audit Dashboard</span>
-            </Link>
-          )}
-
-          {/* SAVE AMENDMENTS BUTTON */}
-          <button
-            onClick={handleSaveAmendments}
-            disabled={saving || !report}
-            className="btn-navy rounded-full px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 shadow-md disabled:opacity-50"
-            title="Save custom clause amendments to database"
-          >
-            {saving ? (
-              <Loader2 size={16} className="animate-spin text-[#C5A059]" />
-            ) : saveSuccess ? (
-              <Check size={16} className="text-emerald-400" />
-            ) : (
-              <Save size={16} className="text-[#C5A059]" />
-            )}
-            <span>{saving ? 'Saving...' : saveSuccess ? 'Saved to Database!' : 'Save Amendments'}</span>
-          </button>
-
-          {/* DOWNLOAD CUSTOM WORD CONTRACT BUTTON */}
-          <button
-            onClick={handleExportCustomDocx}
-            disabled={downloading || !report}
-            className="btn-gold rounded-full px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 shadow-lg hover:scale-105 transition-all disabled:opacity-50"
-            title="Export Microsoft Word (.docx) document with custom user amendments applied"
-          >
-            {downloading ? (
-              <Loader2 size={16} className="animate-spin text-[#0A192F]" />
-            ) : downloadSuccess ? (
-              <Check size={16} className="text-[#0A192F]" />
-            ) : (
-              <Download size={16} />
-            )}
-            <span>
-              {downloading
-                ? 'Exporting .docx...'
-                : downloadSuccess
-                ? 'Word Document Ready!'
-                : 'Download Amended Contract (.docx)'}
-            </span>
-          </button>
-        </div>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#0A192F] tracking-tight">
+          Clause Amendments & Fine-Tuning
+        </h1>
+        <p className="text-slate-600 text-sm mt-1 max-w-2xl">
+          Review clause risk exposure, inspect AI auto-corrections, and manually edit or rewrite provisions to produce an execution-ready customized contract.
+        </p>
       </div>
 
       {/* Contract Selector & Document Overview */}
