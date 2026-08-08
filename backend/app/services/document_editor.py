@@ -61,12 +61,14 @@ def generate_edited_docx(
 
         # Use suggested reworded text if available; otherwise fallback to original
         replacement_text = c_suggestion.strip() if (c_suggestion and c_suggestion.strip()) else c_original.strip()
+        is_amended = replacement_text.strip() != c_original.strip()
 
-        # Section Heading
+        # Section Heading with clear visual badge for amended clauses
         sec_heading_text = f"{idx + 1}. {c_name.upper()}"
+        
         head_p = doc.add_paragraph()
-        head_p.paragraph_format.space_before = Pt(14)
-        head_p.paragraph_format.space_after = Pt(6)
+        head_p.paragraph_format.space_before = Pt(16)
+        head_p.paragraph_format.space_after = Pt(4)
         head_p.paragraph_format.keep_with_next = True
 
         head_run = head_p.add_run(sec_heading_text)
@@ -75,7 +77,20 @@ def generate_edited_docx(
         head_run.font.bold = True
         head_run.font.color.rgb = RGBColor(15, 30, 55)  # Executive Deep Navy
 
-        # Section Paragraph (Reworded / Clean Contract Text)
+        if is_amended:
+            tag_run = head_p.add_run("  [AMENDED PROVISION]")
+            tag_run.font.name = "Calibri"
+            tag_run.font.size = Pt(10)
+            tag_run.font.bold = True
+            tag_run.font.color.rgb = RGBColor(197, 160, 89)  # Gold highlight tag
+        else:
+            tag_run = head_p.add_run("  [ORIGINAL PRESERVED]")
+            tag_run.font.name = "Calibri"
+            tag_run.font.size = Pt(10)
+            tag_run.font.italic = True
+            tag_run.font.color.rgb = RGBColor(120, 130, 140)  # Muted grey tag
+
+        # Section Paragraph (Contract Text)
         p_clause = doc.add_paragraph()
         p_clause.paragraph_format.space_after = Pt(12)
         p_clause.paragraph_format.line_spacing = 1.15
@@ -83,7 +98,11 @@ def generate_edited_docx(
         r_text = p_clause.add_run(replacement_text)
         r_text.font.name = "Calibri"
         r_text.font.size = Pt(11)
-        r_text.font.color.rgb = RGBColor(35, 35, 35)
+        if is_amended:
+            r_text.font.color.rgb = RGBColor(10, 25, 47)  # Deep Navy for amended text
+        else:
+            r_text.font.color.rgb = RGBColor(60, 60, 60)
+
 
     # Document Footer Note
     p_foot = doc.add_paragraph()

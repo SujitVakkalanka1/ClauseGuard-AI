@@ -32,8 +32,10 @@ import {
   Loader2, 
   CheckCircle2, 
   ArrowLeft, 
-  Copy
+  Copy,
+  Ban
 } from 'lucide-react';
+
 
 interface EditableClauseState {
   originalIndex: number;
@@ -470,24 +472,54 @@ export default function AmendmentsPage() {
 
                   {/* Amendment Status Indicator Tag */}
                   <div className="flex items-center gap-2">
-                    {isCustomEdited ? (
+                    {isOriginalMatch ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-mono font-bold shadow-sm">
+                        <Ban size={13} className="text-slate-600" />
+                        Ignored (Original Preserved)
+                      </span>
+                    ) : isCustomEdited ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold shadow-sm">
                         <Edit3 size={13} className="text-blue-600" />
                         Custom User Amendment
                       </span>
-                    ) : isAiMatch ? (
+                    ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-mono font-bold shadow-sm">
                         <CheckCircle2 size={13} className="text-emerald-600" />
                         AI Auto-Correction Active
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-xs font-mono font-semibold">
-                        <FileText size={13} className="text-slate-500" />
-                        Original Text Preserved
-                      </span>
                     )}
                   </div>
                 </div>
+
+                {/* USER DECISION SELECTION BAR (IGNORE RISK VS APPLY AMENDMENT) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-[#F4F5F7] rounded-2xl border border-[#0A192F]/10">
+                  <button
+                    type="button"
+                    onClick={() => handleResetToOriginal(idx)}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all ${
+                      isOriginalMatch
+                        ? 'bg-slate-800 text-white shadow-md border border-slate-700 ring-2 ring-slate-400'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    <Ban size={14} className={isOriginalMatch ? 'text-amber-400' : 'text-slate-500'} />
+                    <span>🚫 Ignore Risk (Keep Original)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApplyAiSuggestion(idx)}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all ${
+                      !isOriginalMatch
+                        ? 'btn-gold text-[#0A192F] shadow-md ring-2 ring-[#C5A059]'
+                        : 'bg-white text-[#0A192F] hover:bg-[#F4F5F7] border border-slate-200'
+                    }`}
+                  >
+                    <Sparkles size={14} className={!isOriginalMatch ? 'text-[#0A192F]' : 'text-[#C5A059]'} />
+                    <span>✨ Apply Amendment (AI / Custom)</span>
+                  </button>
+                </div>
+
 
                 {/* Risk Explanation Banner */}
                 <div className="bg-red-500/5 rounded-2xl p-4 border border-red-500/20 text-xs leading-relaxed space-y-1">
