@@ -91,20 +91,6 @@ This Agreement shall be governed by the laws of New York.`;
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
       
-      {/* Sample Contract Quick Test Pill for Hackathon Judges */}
-      <div className="flex items-center justify-between editorial-card p-3.5 px-5 rounded-2xl border border-[#0A192F]/15">
-        <div className="flex items-center gap-2 text-xs font-mono text-[#C5A059] font-bold">
-          <Sparkles size={14} className="text-[#C5A059] animate-pulse" />
-          <span>Hackathon Demo Quick Test:</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleLoadSampleContract}
-          className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#0A192F] hover:bg-[#112240] text-[#C5A059] border border-[#C5A059]/40 transition-all hover:scale-105"
-        >
-          Load Sample NDA Contract
-        </button>
-      </div>
 
       {/* Drag & Drop Box in Soft Ivory / White with Deep Navy Border */}
       <div
