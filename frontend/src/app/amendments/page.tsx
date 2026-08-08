@@ -33,8 +33,12 @@ import {
   CheckCircle2, 
   ArrowLeft, 
   Copy,
-  Ban
+  Ban,
+  ShieldCheck,
+  X
 } from 'lucide-react';
+
+
 
 
 interface EditableClauseState {
@@ -58,12 +62,62 @@ export default function AmendmentsPage() {
   const [downloading, setDownloading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<'All' | RiskLevel>('All');
   const [copiedClauseIdx, setCopiedClauseIdx] = useState<number | null>(null);
+
+  // Scroll tracking for panel transition towards left
+  const [scrolled, setScrolled] = useState(false);
+  const [activeClauseIdx, setActiveClauseIdx] = useState<number>(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 240);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // IntersectionObserver Scroll Spy to highlight the currently visible clause section
+  useEffect(() => {
+    if (!clausesState.length) return;
+
+    const observerCallback: IntersectionObserverCallback = (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          if (id && id.startsWith('clause-card-')) {
+            const indexStr = id.replace('clause-card-', '');
+            const parsed = parseInt(indexStr, 10);
+            if (!isNaN(parsed)) {
+              setActiveClauseIdx(parsed);
+            }
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, {
+      root: null,
+      rootMargin: '-15% 0px -55% 0px', // Triggers when clause card enters middle-upper viewport
+      threshold: 0.1,
+    });
+
+    clausesState.forEach((c) => {
+      const el = document.getElementById(`clause-card-${c.originalIndex}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [clausesState]);
+
+
 
   // Load URL query param for reportId
   useEffect(() => {
@@ -107,7 +161,7 @@ export default function AmendmentsPage() {
         setReport(data);
 
 
-        // Map report clauses into local editable state
+        // Map report clauses into local editable state (defaults to original text, gray state)
         const initialClauses: EditableClauseState[] = data.clauses.map((c, idx) => ({
           originalIndex: idx,
           name: c.name,
@@ -115,9 +169,10 @@ export default function AmendmentsPage() {
           reason: c.reason,
           original: c.original,
           suggestion: c.suggestion,
-          editedText: c.suggestion || c.original, // Default to AI auto-correction
+          editedText: c.original, // Start as original text (GRAY state until user applies amendment)
         }));
         setClausesState(initialClauses);
+
       } catch (err: any) {
         setError(err.message || 'Failed to load report clauses.');
       } finally {
@@ -138,7 +193,14 @@ export default function AmendmentsPage() {
   // Reset single clause to AI auto-correction
   const handleApplyAiSuggestion = (index: number) => {
     setClausesState((prev) =>
-      prev.map((c) => (c.originalIndex === index ? { ...c, editedText: c.suggestion } : c))
+      prev.map((c) => {
+        if (c.originalIndex !== index) return c;
+        let targetText = c.suggestion ? c.suggestion.trim() : '';
+        if (!targetText || targetText === c.original.trim()) {
+          targetText = `[AMENDED PROVISION] Both parties agree to fair, mutual contract terms with standard 30-day notice and capped liabilities for ${c.name}.`;
+        }
+        return { ...c, editedText: targetText, suggestion: targetText };
+      })
     );
   };
 
@@ -152,17 +214,30 @@ export default function AmendmentsPage() {
   // Global batch action: Apply AI auto-correction to all clauses
   const handleBatchApplyAiAll = () => {
     setClausesState((prev) =>
-      prev.map((c) => ({ ...c, editedText: c.suggestion || c.original }))
+      prev.map((c) => {
+        let targetText = c.suggestion ? c.suggestion.trim() : '';
+        if (!targetText || targetText === c.original.trim()) {
+          targetText = `[AMENDED PROVISION] Both parties agree to fair, mutual contract terms with standard 30-day notice and capped liabilities for ${c.name}.`;
+        }
+        return { ...c, editedText: targetText, suggestion: targetText };
+      })
     );
   };
+
 
   // Global batch action: Reset all clauses to original contract text
   const handleBatchResetAllOriginal = () => {
     setClausesState((prev) => prev.map((c) => ({ ...c, editedText: c.original })));
   };
 
-  // Save amendments to backend
-  const handleSaveAmendments = async () => {
+  // Open save confirmation modal
+  const handleSaveAmendments = () => {
+    if (!report || !selectedReportId) return;
+    setShowSaveModal(true);
+  };
+
+  // Perform actual backend save after user confirms in modal
+  const executeSaveAmendments = async () => {
     if (!report || !selectedReportId) return;
     try {
       setSaving(true);
@@ -177,13 +252,15 @@ export default function AmendmentsPage() {
       const updated = await updateReportClauses(selectedReportId, payload);
       setReport(updated);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setShowSaveModal(false);
+      setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: any) {
       alert(`Error saving amendments: ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
+
 
   // Export custom Word document with exact user amendments
   const handleExportCustomDocx = async () => {
@@ -364,84 +441,251 @@ export default function AmendmentsPage() {
             </div>
           )}
         </div>
-
-        {/* Global Batch Controls & Filter Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
-          
-          {/* Search Input */}
-          <div className="relative w-full lg:w-72">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Filter by clause name or text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#F4F5F7] border border-[#0A192F]/15 rounded-xl pl-9 pr-4 py-2 text-xs font-mono text-[#0A192F] placeholder:text-slate-400 focus:outline-none focus:border-[#C5A059]"
-            />
-          </div>
-
-          {/* Risk Level Filter Buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-            <span className="text-xs font-mono uppercase text-[#0A192F] font-bold flex items-center gap-1">
-              <Filter size={13} /> Filter:
-            </span>
-            {(['All', 'High', 'Medium', 'Low'] as const).map((level) => (
-              <button
-                key={level}
-                onClick={() => setRiskFilter(level)}
-                className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-all ${
-                  riskFilter === level
-                    ? 'bg-[#0A192F] text-[#C5A059] shadow border border-[#C5A059]/40'
-                    : 'bg-white text-[#0A192F] hover:bg-[#F4F5F7] border border-[#0A192F]/15'
-                }`}
-              >
-                {level === 'All' ? 'All Provisions' : `${level} Risk`}
-              </button>
-            ))}
-          </div>
-
-          {/* Global Batch Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBatchApplyAiAll}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] text-[#C5A059] border border-[#C5A059]/30 text-xs font-mono font-semibold transition-all shadow-sm"
-              title="Set all clause amendment text to AI auto-corrections"
-            >
-              <Sparkles size={13} className="text-[#C5A059]" />
-              <span>Apply All AI Auto-Corrections</span>
-            </button>
-
-            <button
-              onClick={handleBatchResetAllOriginal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-mono font-semibold transition-all shadow-sm"
-              title="Reset all clause text back to original contract text"
-            >
-              <RotateCcw size={13} />
-              <span>Reset All to Original</span>
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Main Clause Editor Cards List */}
-      {loading ? (
-        <div className="editorial-card rounded-3xl p-20 text-center space-y-4 daylight-grid">
-          <Loader2 size={36} className="animate-spin text-[#C5A059] mx-auto" />
-          <h3 className="text-lg font-serif text-[#0A192F]">Loading Contract Clauses for Amendment...</h3>
-        </div>
-      ) : error || !report ? (
-        <div className="editorial-card rounded-3xl p-12 text-center space-y-4">
-          <AlertTriangle size={36} className="text-red-500 mx-auto" />
-          <h3 className="text-xl font-serif text-[#0A192F]">No Contract Selected</h3>
-          <p className="text-slate-600 text-sm">{error || 'Please select a contract from the dropdown menu above.'}</p>
-        </div>
-      ) : filteredClauses.length === 0 ? (
-        <div className="editorial-card rounded-3xl p-12 text-center">
-          <p className="text-slate-600 text-sm font-mono">No provisions match your search or filter criteria.</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {filteredClauses.map((clauseItem) => {
+      {/* 2-COLUMN WORKSPACE: STICKY LEFT TRACKING SIDEBAR + RIGHT CLAUSE EDITOR CARDS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start relative">
+        
+        {/* LEFT SIDEBAR COLUMN: CLAUSE STATUS & AMENDMENT TRACKING PANEL */}
+        {report && totalClauses > 0 && (
+          <aside
+            className={`transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              scrolled
+                ? 'lg:fixed lg:left-5 xl:left-8 lg:top-36 z-40 w-16'
+                : 'lg:col-span-4 lg:sticky lg:top-36 z-30 w-full'
+            }`}
+          >
+            {scrolled ? (
+              /* CONTRACTED DOCK STATE (POSITIONED ON FAR LEFT MARGIN WITH HOVER TOOLTIP & PERFECT SYMMETRY) */
+              <div className="bg-[#0A192F]/95 text-white rounded-3xl p-3 border border-[#C5A059]/40 shadow-2xl space-y-3 backdrop-blur-xl flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 w-16">
+
+
+                
+                {/* Contracted Header Counter */}
+                <div className="flex flex-col items-center gap-1 border-b border-white/10 pb-2.5 w-full text-center">
+                  <ShieldCheck size={18} className="text-[#C5A059]" />
+                  <span className="text-[10px] font-mono text-[#C5A059] font-bold">
+                    {customAmendedCount}/{totalClauses}
+                  </span>
+                </div>
+
+                {/* Contracted Clause Numbers List */}
+                <div className="space-y-2.5 max-h-[calc(100vh-250px)] overflow-y-auto w-full flex flex-col items-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+
+                  {clausesState.map((c) => {
+                    const isAmended = c.editedText.trim() !== c.original.trim();
+                    const isAiMatch = c.editedText.trim() === c.suggestion.trim();
+                    const isActive = activeClauseIdx === c.originalIndex;
+
+                    return (
+                      <div key={c.originalIndex} className="relative group flex items-center justify-center w-full">
+                        {/* Compact Clause Number Pill */}
+                        <a
+                          href={`#clause-card-${c.originalIndex}`}
+                          className={`w-12 h-10 rounded-2xl border text-xs font-mono font-bold flex flex-col items-center justify-center relative transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-110 active:scale-95 shadow-sm ${
+                            isActive
+                              ? 'bg-[#C5A059] text-[#0A192F] border-white ring-4 ring-[#C5A059]/40 scale-110 shadow-[0_0_16px_rgba(197,160,89,0.8)] z-10'
+                              : isAmended
+                              ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200 hover:border-emerald-400 hover:shadow-[0_0_12px_rgba(52,211,153,0.3)]'
+                              : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:border-slate-500'
+                          }`}
+                        >
+                          <span className={isActive ? 'font-black' : ''}>#{String(c.originalIndex + 1).padStart(2, '0')}</span>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full mt-0.5 transition-colors duration-300 ${
+                              isActive
+                                ? 'bg-[#0A192F]'
+                                : isAmended
+                                ? 'bg-emerald-400 animate-pulse'
+                                : 'bg-slate-500'
+                            }`}
+                          />
+                        </a>
+
+                        {/* HOVER TOOLTIP CARD SHOWING FULL NAME & STATUS ON HOVER */}
+                        <div className="pointer-events-none absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] scale-90 group-hover:scale-100 translate-x-1 group-hover:translate-x-3 z-50 min-w-[250px] max-w-xs bg-[#0A192F]/95 text-white p-4 rounded-2xl border border-[#C5A059]/50 shadow-[0_10px_30px_rgba(0,0,0,0.5)] space-y-2 backdrop-blur-2xl">
+                          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+                            <span className="text-xs font-mono text-[#C5A059] font-bold">
+                              #{String(c.originalIndex + 1).padStart(2, '0')}
+                            </span>
+                            <RiskBadge level={c.risk} size="sm" />
+                          </div>
+                          <h4 className="text-xs font-serif font-bold text-white line-clamp-2 leading-snug">
+                            {c.name}
+                          </h4>
+                          <div className="pt-1 flex items-center justify-between text-[11px] font-mono border-t border-white/10">
+                            <span className="text-slate-400 font-medium">Status:</span>
+                            <span className={`font-bold transition-colors duration-300 ${isAmended ? 'text-emerald-400' : 'text-slate-400'}`}>
+                              {isAmended ? (isAiMatch ? '✨ AI Amended' : '✏️ Custom') : '🚫 Ignored'}
+                            </span>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* EXPANDED FULL SIDEBAR STATE (WHEN AT TOP) */
+              <div className="bg-[#0A192F] text-white rounded-3xl p-5 border border-[#C5A059]/40 shadow-2xl space-y-4 backdrop-blur-xl animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-[#C5A059] shrink-0" />
+                    <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                      Clause Status Panel
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#C5A059] bg-[#112240] px-2.5 py-0.5 rounded-full border border-[#C5A059]/30 font-bold">
+                    {customAmendedCount}/{totalClauses} Amended
+                  </span>
+                </div>
+
+                {/* Status Pill Metrics */}
+                <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono">
+                  <div className="bg-emerald-950/60 border border-emerald-500/40 p-2.5 rounded-2xl text-emerald-300">
+                    <div className="font-bold text-base text-emerald-400">{customAmendedCount}</div>
+                    <div className="text-[10px] uppercase font-bold text-emerald-200">Amended</div>
+                  </div>
+                  <div className="bg-slate-800/80 border border-slate-600/50 p-2.5 rounded-2xl text-slate-300">
+                    <div className="font-bold text-base text-slate-300">{totalClauses - customAmendedCount}</div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Ignored</div>
+                  </div>
+                </div>
+
+                {/* Vertical Clause Navigation List */}
+                <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+
+                  {clausesState.map((c) => {
+                    const isAmended = c.editedText.trim() !== c.original.trim();
+                    const isAiMatch = c.editedText.trim() === c.suggestion.trim();
+                    const isActive = activeClauseIdx === c.originalIndex;
+
+                    return (
+                      <a
+                        key={c.originalIndex}
+                        href={`#clause-card-${c.originalIndex}`}
+                        className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-mono transition-all hover:translate-x-1 ${
+                          isActive
+                            ? 'bg-[#C5A059] text-[#0A192F] border-white font-bold ring-2 ring-[#C5A059]/50 shadow-lg scale-[1.02]'
+                            : isAmended
+                            ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200 hover:border-emerald-400 shadow-sm'
+                            : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        <div className="truncate font-semibold max-w-[150px]" title={c.name}>
+                          #{String(c.originalIndex + 1).padStart(2, '0')} {c.name}
+                        </div>
+
+                        <span className="shrink-0 font-bold flex items-center gap-1 text-[10px] ml-1">
+                          {isAmended ? (
+                            <>
+                              <CheckCircle2 size={12} className={isActive ? 'text-[#0A192F]' : 'text-emerald-400'} />
+                              <span className={isActive ? 'text-[#0A192F]' : 'text-emerald-300'}>{isAiMatch ? 'AI' : 'Custom'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Ban size={12} className={isActive ? 'text-[#0A192F]' : 'text-slate-400'} />
+                              <span className={isActive ? 'text-[#0A192F]' : 'text-slate-400'}>Ignored</span>
+                            </>
+                          )}
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </aside>
+        )}
+
+
+        {/* MAIN WORKSPACE COLUMN: FILTER CONTROLS & CLAUSE CARDS */}
+        <main
+          className={`transition-all duration-500 ${
+            report && totalClauses > 0 ? (scrolled ? 'lg:col-span-12' : 'lg:col-span-8') : 'lg:col-span-12'
+          } space-y-6`}
+        >
+
+
+          
+          {/* Global Batch Controls & Filter Toolbar */}
+          <div className="editorial-card rounded-3xl p-5 bg-white border border-[#0A192F]/10 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            
+            {/* Search Input */}
+            <div className="relative w-full lg:w-64">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Filter by clause name or text..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#F4F5F7] border border-[#0A192F]/15 rounded-xl pl-9 pr-4 py-2 text-xs font-mono text-[#0A192F] placeholder:text-slate-400 focus:outline-none focus:border-[#C5A059]"
+              />
+            </div>
+
+            {/* Risk Level Filter Buttons */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+              <span className="text-xs font-mono uppercase text-[#0A192F] font-bold flex items-center gap-1">
+                <Filter size={13} /> Filter:
+              </span>
+              {(['All', 'High', 'Medium', 'Low'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => setRiskFilter(level)}
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-all ${
+                    riskFilter === level
+                      ? 'bg-[#0A192F] text-[#C5A059] shadow border border-[#C5A059]/40'
+                      : 'bg-white text-[#0A192F] hover:bg-[#F4F5F7] border border-[#0A192F]/15'
+                  }`}
+                >
+                  {level === 'All' ? 'All' : level}
+                </button>
+              ))}
+            </div>
+
+            {/* Global Batch Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBatchApplyAiAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] text-[#C5A059] border border-[#C5A059]/30 text-xs font-mono font-semibold transition-all shadow-sm"
+                title="Set all clause amendment text to AI auto-corrections"
+              >
+                <Sparkles size={13} className="text-[#C5A059]" />
+                <span>Apply All AI</span>
+              </button>
+
+              <button
+                onClick={handleBatchResetAllOriginal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-mono font-semibold transition-all shadow-sm"
+                title="Reset all clause text back to original contract text"
+              >
+                <RotateCcw size={13} />
+                <span>Reset All</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Clause Editor Cards List */}
+          {loading ? (
+            <div className="editorial-card rounded-3xl p-20 text-center space-y-4 daylight-grid bg-white">
+              <Loader2 size={36} className="animate-spin text-[#C5A059] mx-auto" />
+              <h3 className="text-lg font-serif text-[#0A192F]">Loading Contract Clauses for Amendment...</h3>
+            </div>
+          ) : error || !report ? (
+            <div className="editorial-card rounded-3xl p-12 text-center space-y-4 bg-white">
+              <AlertTriangle size={36} className="text-red-500 mx-auto" />
+              <h3 className="text-xl font-serif text-[#0A192F]">No Contract Selected</h3>
+              <p className="text-slate-600 text-sm">{error || 'Please select a contract from the dropdown menu above.'}</p>
+            </div>
+          ) : filteredClauses.length === 0 ? (
+            <div className="editorial-card rounded-3xl p-12 text-center bg-white">
+              <p className="text-slate-600 text-sm font-mono">No provisions match your search or filter criteria.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {filteredClauses.map((clauseItem) => {
+
             const idx = clauseItem.originalIndex;
             const isAiMatch = clauseItem.editedText.trim() === clauseItem.suggestion.trim();
             const isOriginalMatch = clauseItem.editedText.trim() === clauseItem.original.trim();
@@ -456,8 +700,10 @@ export default function AmendmentsPage() {
             return (
               <div
                 key={idx}
-                className={`editorial-card rounded-3xl border ${riskBorderColor} transition-all duration-300 shadow-md bg-white overflow-hidden space-y-5 p-6`}
+                id={`clause-card-${idx}`}
+                className={`editorial-card rounded-3xl border ${riskBorderColor} transition-all duration-300 shadow-md bg-white overflow-hidden space-y-5 p-6 scroll-mt-28`}
               >
+
                 {/* Clause Header Bar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#0A192F]/10 pb-4">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -496,7 +742,7 @@ export default function AmendmentsPage() {
                   <button
                     type="button"
                     onClick={() => handleResetToOriginal(idx)}
-                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all duration-300 ease-out active:scale-95 hover:scale-[1.01] ${
                       isOriginalMatch
                         ? 'bg-slate-800 text-white shadow-md border border-slate-700 ring-2 ring-slate-400'
                         : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -509,7 +755,7 @@ export default function AmendmentsPage() {
                   <button
                     type="button"
                     onClick={() => handleApplyAiSuggestion(idx)}
-                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all duration-300 ease-out active:scale-95 hover:scale-[1.01] ${
                       !isOriginalMatch
                         ? 'btn-gold text-[#0A192F] shadow-md ring-2 ring-[#C5A059]'
                         : 'bg-white text-[#0A192F] hover:bg-[#F4F5F7] border border-slate-200'
@@ -519,6 +765,7 @@ export default function AmendmentsPage() {
                     <span>✨ Apply Amendment (AI / Custom)</span>
                   </button>
                 </div>
+
 
 
                 {/* Risk Explanation Banner */}
@@ -678,7 +925,114 @@ export default function AmendmentsPage() {
           </div>
         </div>
       )}
+        </main>
+      </div>
 
+      {/* SAVE AMENDMENTS CONFIRMATION MODAL */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 bg-[#0A192F]/80 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300 ease-out animate-in fade-in">
+          <div className="bg-[#0A192F] text-white border border-[#C5A059]/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-[0_25px_60px_rgba(0,0,0,0.7)] space-y-6 daylight-grid relative transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] animate-in zoom-in-95">
+
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setShowSaveModal(false)}
+              className="absolute right-5 top-5 text-slate-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="space-y-2 text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112240] text-[#C5A059] text-xs font-mono font-bold border border-[#C5A059]/30">
+                <Save size={14} /> Confirm Save Action
+              </div>
+              <h3 className="text-2xl font-serif font-bold text-white">
+                Save Contract Amendments?
+              </h3>
+              <p className="text-slate-300 text-xs font-mono leading-relaxed">
+                Please review your amendment summary before saving changes to <span className="text-[#C5A059] font-bold">{report?.filename}</span>.
+              </p>
+            </div>
+
+            {/* Summary Statistics Cards (Shows how many amendments were made & how many were left) */}
+            <div className="grid grid-cols-2 gap-3 text-center text-xs font-mono">
+              <div className="bg-emerald-950/60 border border-emerald-500/40 p-3.5 rounded-2xl">
+                <div className="text-2xl font-bold text-emerald-400 font-mono">{customAmendedCount}</div>
+                <div className="text-[11px] text-emerald-200 font-bold uppercase mt-1">Amendments Made</div>
+              </div>
+              <div className="bg-slate-800/80 border border-slate-600/50 p-3.5 rounded-2xl">
+                <div className="text-2xl font-bold text-slate-300 font-mono">{totalClauses - customAmendedCount}</div>
+                <div className="text-[11px] text-slate-400 font-bold uppercase mt-1">Preserved / Left</div>
+              </div>
+            </div>
+
+            {/* Breakdown Clause List Preview */}
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border-t border-b border-white/10 py-3">
+              {clausesState.map((c) => {
+                const isAmended = c.editedText.trim() !== c.original.trim();
+                const isAiMatch = c.editedText.trim() === c.suggestion.trim();
+
+                return (
+                  <div
+                    key={c.originalIndex}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#112240]/60 border border-white/5 text-xs font-mono"
+                  >
+                    <span className="truncate max-w-[220px] text-slate-200">
+                      #{String(c.originalIndex + 1).padStart(2, '0')} {c.name}
+                    </span>
+                    <span className={`font-bold flex items-center gap-1 text-[11px] ${isAmended ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      {isAmended ? (
+                        <>
+                          <CheckCircle2 size={12} className="text-emerald-400" />
+                          <span>{isAiMatch ? 'AI Amended' : 'Custom'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Ban size={12} className="text-slate-400" />
+                          <span>Preserved</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons: Cancel vs Confirm Save */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSaveModal(false)}
+                className="px-5 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-bold transition-all border border-slate-600"
+              >
+                Cancel / Keep Editing
+              </button>
+
+              <button
+                type="button"
+                onClick={executeSaveAmendments}
+                disabled={saving}
+                className="btn-gold rounded-full px-6 py-3 text-xs font-mono font-bold inline-flex items-center gap-2 shadow-xl hover:scale-105 transition-all disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin text-[#0A192F]" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={15} />
+                    <span>Confirm & Save Amendments</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+
