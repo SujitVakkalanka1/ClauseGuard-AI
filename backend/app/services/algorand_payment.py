@@ -41,8 +41,13 @@ def submit_algorand_payment(reference_id: str, amount_algo: float = 0.001) -> di
     if not settings.ALGORAND_SENDER_MNEMONIC:
         raise ValueError("Backend ALGORAND_SENDER_MNEMONIC is not configured in .env.")
 
-    if not reference_id or not reference_id.strip():
-        raise ValueError("Valid reference_id is required for payment submission.")
+    import re
+    cleaned_ref = reference_id.strip()
+    if not cleaned_ref or not re.match(r"^[A-Za-z0-9_-]+$", cleaned_ref):
+        raise ValueError("Valid alphanumeric reference_id is required for payment submission.")
+
+    reference_id = cleaned_ref
+
 
     # Derive private key and address from mnemonic (NEVER LOGGED OR PRINTED)
     private_key = mnemonic.to_private_key(settings.ALGORAND_SENDER_MNEMONIC.strip())

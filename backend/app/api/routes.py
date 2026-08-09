@@ -36,15 +36,21 @@ def process_challenge_payment(payload: Dict[str, Any] = Body(...)):
     if not reference_id or not isinstance(reference_id, str):
         raise HTTPException(status_code=400, detail="Field 'reference_id' is required.")
 
+    import re
+    cleaned_ref = reference_id.strip()
+    if not re.match(r"^[A-Za-z0-9_-]+$", cleaned_ref):
+        raise HTTPException(status_code=400, detail="Invalid character format in 'reference_id'.")
+
     try:
-        tx_result = submit_algorand_payment(reference_id)
+        tx_result = submit_algorand_payment(cleaned_ref)
         return {
             "status": "CONFIRMED",
             "message": "Payment confirmed on Algorand TestNet",
             "txid": tx_result["txid"],
             "amount": tx_result["amount"],
-            "reference_id": reference_id
+            "reference_id": cleaned_ref
         }
+
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
@@ -286,11 +292,15 @@ def recalculate_score(payload: RecalculateScoreRequest):
     """
     Recalculates overall weighted contract risk score based on active clause status.
     """
+    if len(payload.clauses) > 200:
+        raise HTTPException(status_code=400, detail="Clause payload exceeds maximum limit of 200 items.")
+
     result = calculate_overall_risk(payload.clauses)
     return RecalculateScoreResponse(
         score=result["score"],
         breakdown=ScoreBreakdown(**result["breakdown"])
     )
+
 
 
 @router.get("/report/{contract_id}/pdf")
