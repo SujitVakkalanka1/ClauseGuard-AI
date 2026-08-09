@@ -1,9 +1,18 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 
+# Word-level diff segment schema
+class DiffSegment(BaseModel):
+    type: Literal["unchanged", "removed", "added"]
+    text: str
+
 # Single Clause Risk Analysis Schema (matches required LLM shape)
 class ClauseAnalysis(BaseModel):
+    clause_id: Optional[str] = Field(default=None, description="Unique identifier for the clause")
+    original_text: Optional[str] = Field(default=None, description="Original clause text")
+    amended_text: Optional[str] = Field(default=None, description="Amended clause text")
+    diff_segments: List[DiffSegment] = Field(default_factory=list, description="Structured word-level diff segments")
     name: str = Field(description="Name or category of the clause e.g. Indemnity, Liability Cap")
     risk: Literal["High", "Medium", "Low"] = Field(description="Assigned risk level: High, Medium, or Low")
     reason: str = Field(description="Detailed explanation of why this clause is risky")
@@ -11,6 +20,16 @@ class ClauseAnalysis(BaseModel):
     original: str = Field(description="Exact original clause text extracted from document")
     line_number: Optional[int] = Field(default=None, description="Line number of clause in source document")
     topic: Optional[str] = Field(default=None, description="Topic section or category of the clause")
+
+    @model_validator(mode="after")
+    def populate_defaults(self) -> "ClauseAnalysis":
+        if not self.original_text:
+            self.original_text = self.original
+        if not self.amended_text:
+            self.amended_text = self.suggestion
+        return self
+
+
 
 
 # Full Contract Analysis Report Schema (matches required LLM shape)
@@ -75,4 +94,19 @@ class TransactionResponse(BaseModel):
 
 class UpdateClausesRequest(BaseModel):
     clauses: List[ClauseAnalysis]
+
+
+class ScoreBreakdown(BaseModel):
+    low: int = 0
+    medium: int = 0
+    high: int = 0
+
+
+class RecalculateScoreRequest(BaseModel):
+    clauses: List[Dict[str, Any]]
+
+
+class RecalculateScoreResponse(BaseModel):
+    score: float
+    breakdown: ScoreBreakdown
 

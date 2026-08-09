@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.main import app
 from app.database import Base, get_db
+from app.config import settings
 from app.services.payment_verifier import verify_transaction_proof
 
 TEST_DB_URL = "sqlite:///./test_x402.db"
@@ -64,7 +65,7 @@ def test_analyze_without_payment_header_returns_402():
     x402 = detail["x402"]
     assert x402["amount"] == 0.001
     assert x402["asset"] == "ALGO"
-    assert x402["pay_to"] == "ALGO_DEMO_RECIPIENT_ADDRESS_PHASE2_STUB"
+    assert x402["pay_to"] in [getattr(settings, "ALGORAND_RECIPIENT_ADDRESS", None), "ALGO_DEMO_RECIPIENT_ADDRESS_PHASE2_STUB"]
     assert x402["reference_id"].startswith("req_")
 
 def test_analyze_with_valid_payment_header_succeeds():

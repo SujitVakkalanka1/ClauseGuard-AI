@@ -110,9 +110,27 @@ CONFIDENTIAL LEGAL AUDIT REPORT - CLAUSEGUARD AI
   const link = document.createElement('a');
   link.href = url;
   const baseName = report.filename.replace(/\.[^/.]+$/, '');
-  link.download = `${baseName}_LEGAL_AUDIT_REPORT.txt`;
+  link.download = `${baseName}_EXECUTIVE_RISK_AUDIT_REPORT.txt`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads branded PDF Summary Report from backend endpoint GET /api/report/{contract_id}/pdf.
+ */
+export function downloadSummaryPdfReport(contractId: string | number, filename: string) {
+  const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const cleanUrl = rawUrl.replace(/\/$/, '');
+  const baseUrl = cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  const downloadUrl = `${baseUrl}/report/${contractId}/pdf`;
+
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+  link.download = `${baseName}_SUMMARY_REPORT.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

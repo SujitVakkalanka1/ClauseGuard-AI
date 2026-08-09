@@ -62,8 +62,8 @@ def generate_edited_docx(
     # Render each clause cleanly as a contract section
     for idx, c in enumerate(sorted_clauses):
         c_name = getattr(c, "clause_name", getattr(c, "name", f"Section {idx+1}"))
-        c_suggestion = getattr(c, "recommendation", getattr(c, "suggestion", ""))
-        c_original = getattr(c, "original_text", getattr(c, "original", ""))
+        c_suggestion = getattr(c, "recommendation", None) or getattr(c, "suggestion", None) or getattr(c, "amended_text", "") or ""
+        c_original = getattr(c, "original_text", None) or getattr(c, "original", "") or ""
         c_line = getattr(c, "line_number", None) or getattr(c, "line_no", None) or (idx * 14 + 3)
         c_topic = getattr(c, "topic", None) or c_name
 

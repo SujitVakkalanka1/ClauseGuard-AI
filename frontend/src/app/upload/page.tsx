@@ -26,6 +26,8 @@ export default function UploadPage() {
   const [showPaymentToast, setShowPaymentToast] = useState(false);
   const [confirmedTxid, setConfirmedTxid] = useState<string>('');
 
+  const [contractType, setContractType] = useState<string>('General/Other');
+
   const startAnalysis = async (file: File, proofTxId?: string) => {
     setIsProcessing(true);
     setCurrentStep(1);
@@ -40,7 +42,7 @@ export default function UploadPage() {
     }, 1200);
 
     try {
-      const response = await analyzeContract(file, proofTxId);
+      const response = await analyzeContract(file, proofTxId, contractType);
       setCurrentStep(5);
 
       setTimeout(() => {
@@ -116,6 +118,26 @@ export default function UploadPage() {
             ? 'Please wait while our AI engine scans clauses and evaluates liabilities.'
             : 'Select or drag your contract (PDF or DOCX) to detect high-risk terms instantly.'}
         </p>
+
+        {/* Contract Type Playbook Dropdown Selector */}
+        {!isProcessing && (
+          <div className="pt-4 max-w-md mx-auto">
+            <label className="block text-xs font-mono text-[#0A192F] uppercase tracking-wider font-bold mb-2 text-left">
+              Contract Type Playbook (Tailors AI Risk Analysis)
+            </label>
+            <select
+              value={contractType}
+              onChange={(e) => setContractType(e.target.value)}
+              className="w-full bg-white border border-[#0A192F]/20 rounded-2xl px-4 py-3 text-sm font-medium text-[#0A192F] shadow-sm focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all cursor-pointer"
+            >
+              <option value="General/Other">General / Other Commercial Contract</option>
+              <option value="NDA">NDA (Non-Disclosure Agreement)</option>
+              <option value="SaaS Agreement">SaaS Agreement / Software License</option>
+              <option value="Employment Contract">Employment Contract / Executive Offer</option>
+              <option value="Freelance/Vendor Agreement">Freelance / Vendor Services Agreement</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {errorMsg && (
@@ -136,6 +158,7 @@ export default function UploadPage() {
       ) : (
         <FileUploader onFileSelect={handleFileSubmit} isLoading={isProcessing} />
       )}
+
 
       {/* x402 "Pay Now" Screen Modal */}
       <PaymentModal

@@ -40,9 +40,14 @@ export async function payChallenge(referenceId: string): Promise<{ txid: string;
   }
 }
 
-export async function analyzeContract(file: File, paymentProofTxId?: string): Promise<AnalysisResponse> {
+export async function analyzeContract(
+  file: File, 
+  paymentProofTxId?: string, 
+  contractType: string = 'General/Other'
+): Promise<AnalysisResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('contract_type', contractType);
 
   const headers: Record<string, string> = {};
   if (paymentProofTxId) {
@@ -50,6 +55,7 @@ export async function analyzeContract(file: File, paymentProofTxId?: string): Pr
   }
 
   let response: Response;
+
   try {
     response = await fetch(`${API_BASE_URL}/analyze`, {
       method: 'POST',
@@ -136,4 +142,24 @@ export async function updateReportClauses(
 
   return response.json();
 }
+
+export async function recalculateScore(
+  clauses: any[]
+): Promise<{ score: number; breakdown: { low: number; medium: number; high: number } }> {
+  const response = await fetch(`${API_BASE_URL}/recalculate-score`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ clauses }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to recalculate score');
+  }
+
+  return response.json();
+}
+
 

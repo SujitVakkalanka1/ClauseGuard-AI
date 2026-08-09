@@ -1,6 +1,15 @@
 export type RiskLevel = 'High' | 'Medium' | 'Low';
 
+export interface DiffSegment {
+  type: 'unchanged' | 'removed' | 'added';
+  text: string;
+}
+
 export interface ClauseAnalysis {
+  clause_id?: string;
+  original_text?: string;
+  amended_text?: string;
+  diff_segments?: DiffSegment[];
   name: string;
   risk: RiskLevel;
   reason: string;
@@ -9,6 +18,7 @@ export interface ClauseAnalysis {
   line_number?: number;
   topic?: string;
 }
+
 
 export interface AnalysisResponse {
   id: number;

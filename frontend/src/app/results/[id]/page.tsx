@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AnalysisResponse, RiskLevel } from '@/lib/types';
 import { fetchReportDetails } from '@/lib/api';
-import { downloadEditedContractDocx, downloadExecutiveAuditReport } from '@/lib/exportUtils';
+import { downloadEditedContractDocx, downloadExecutiveAuditReport, downloadSummaryPdfReport } from '@/lib/exportUtils';
 import { RiskSummaryCards } from '@/components/RiskSummaryCards';
 import { ClauseCard } from '@/components/ClauseCard';
 import { 
@@ -20,8 +20,10 @@ import {
   Download,
   FileCheck,
   Sparkles,
-  Edit3
+  Edit3,
+  ShieldCheck
 } from 'lucide-react';
+
 
 
 export default function ResultsDashboardPage() {
@@ -126,7 +128,20 @@ export default function ResultsDashboardPage() {
 
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          
+          {/* VERIFIED ON-CHAIN BADGE */}
+          {report.payment_txid && (
+            <a
+              href={`https://testnet.explorer.perawallet.app/tx/${report.payment_txid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-xs font-mono font-bold hover:bg-emerald-500/20 transition-all shadow-sm"
+              title="View cryptographic on-chain verification receipt on Algorand Pera Explorer"
+            >
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span>Verified on-chain ({report.payment_txid.slice(0, 6)}...{report.payment_txid.slice(-4)})</span>
+            </a>
+          )}
+
           {/* EDIT & AMEND CLAUSES BUTTON */}
           <Link
             href={`/amendments?reportId=${report.id}`}
@@ -136,6 +151,16 @@ export default function ResultsDashboardPage() {
             <Edit3 size={14} className="text-[#C5A059]" />
             <span>Edit & Amend Clauses</span>
           </Link>
+
+          {/* DOWNLOAD PDF SUMMARY REPORT BUTTON */}
+          <button
+            onClick={() => downloadSummaryPdfReport(report.id, report.filename)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#0A192F] hover:bg-[#112240] text-[#F8F9FA] border border-[#C5A059]/40 text-xs font-mono font-semibold transition-all shadow-md hover:scale-105 cursor-pointer"
+            title="Download 1-page PDF Summary Report with charts and Algorand receipt"
+          >
+            <FileText size={14} className="text-[#C5A059]" />
+            <span>Download Report (PDF)</span>
+          </button>
 
           {/* DOWNLOAD EDITED WORD CONTRACT BUTTON */}
           <button
@@ -156,15 +181,14 @@ export default function ResultsDashboardPage() {
             )}
           </button>
 
-
           {/* DOWNLOAD AUDIT REPORT BUTTON */}
           <button
             onClick={handleDownloadReport}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#0A192F] hover:bg-[#112240] text-[#C5A059] border border-[#C5A059]/40 text-xs font-mono font-semibold transition-all shadow-sm"
-            title="Download full executive risk audit report"
+            title="Download full executive risk audit report (.txt)"
           >
             <FileCheck size={14} />
-            <span>Download Audit Report</span>
+            <span>Download Text Audit Report</span>
           </button>
 
           {/* SHARE LINK */}
@@ -176,6 +200,7 @@ export default function ResultsDashboardPage() {
             <span>{copiedLink ? 'Link Copied' : 'Share'}</span>
           </button>
         </div>
+
       </div>
 
       {/* Overview & Metric Cards */}

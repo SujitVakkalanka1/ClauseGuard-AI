@@ -11,13 +11,16 @@ import {
 import { 
   fetchHistory, 
   fetchReportDetails, 
-  updateReportClauses 
+  updateReportClauses,
+  recalculateScore 
 } from '@/lib/api';
 import { 
   downloadCustomAmendedDocx 
 } from '@/lib/exportUtils';
 import { RiskBadge } from '@/components/RiskBadge';
+import { DiffViewer, DiffSegment } from '@/components/DiffViewer';
 import { PaymentSuccessToast } from '@/components/PaymentSuccessToast';
+
 import { 
   Edit3, 
   Sparkles, 
@@ -42,6 +45,7 @@ import {
 } from 'lucide-react';
 
 interface EditableClauseState {
+  clause_id?: string;
   originalIndex: number;
   name: string;
   risk: RiskLevel;
@@ -51,7 +55,37 @@ interface EditableClauseState {
   editedText: string; // Active editable user text
   line_number: number;
   topic: string;
+  diff_segments?: DiffSegment[];
 }
+
+function AnimatedScore({ value }: { value: number }) {
+  const [displayVal, setDisplayVal] = useState(value);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    const startVal = displayVal;
+    const endVal = value;
+    const startTime = performance.now();
+    const duration = 400;
+
+    const update = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const current = startVal + (endVal - startVal) * progress;
+      setDisplayVal(current);
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(update);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [value]);
+
+  return <span className="font-mono font-extrabold">{displayVal.toFixed(2)}</span>;
+}
+
+export type ClauseStatus = 'accepted' | 'rejected' | 'pending';
 
 export default function AmendmentsPage() {
   const [historyItems, setHistoryItems] = useState<HistoryItemResponse[]>([]);
@@ -59,6 +93,19 @@ export default function AmendmentsPage() {
   const [report, setReport] = useState<AnalysisResponse | null>(null);
   const [clausesState, setClausesState] = useState<EditableClauseState[]>([]);
   
+  // Clause Accept/Reject/Pending Status Tracking & Live Score
+  const [clauseStatuses, setClauseStatuses] = useState<Record<string | number, ClauseStatus>>({});
+  const [liveRiskScore, setLiveRiskScore] = useState<number>(0);
+  const [liveBreakdown, setLiveBreakdown] = useState<{ low: number; medium: number; high: number }>({ low: 0, medium: 0, high: 0 });
+
+  const updateClauseStatus = (key: string | number, status: ClauseStatus) => {
+    setClauseStatuses((prev): Record<string | number, ClauseStatus> => ({
+      ...prev,
+      [key]: status,
+    }));
+  };
+
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -81,6 +128,35 @@ export default function AmendmentsPage() {
       }
     }
   }, []);
+
+  // 400ms debounced live score recalculation
+  useEffect(() => {
+    if (!clausesState.length) return;
+
+    const timer = setTimeout(async () => {
+      const payloadClauses = clausesState.map((c) => {
+        const key = c.clause_id || c.originalIndex;
+        const st = clauseStatuses[key] || 'pending';
+        const mappedStatus = st === 'pending' ? 'original' : st;
+        return {
+          clause_id: key,
+          risk_level: c.risk,
+          status: mappedStatus,
+        };
+      });
+
+      try {
+        const res = await recalculateScore(payloadClauses);
+        setLiveRiskScore(res.score);
+        setLiveBreakdown(res.breakdown);
+      } catch (err) {
+        console.error('Failed to recalculate risk score:', err);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [clauseStatuses, clausesState]);
+
 
 
   // Search & Filters
@@ -183,19 +259,29 @@ export default function AmendmentsPage() {
           (a, b) => (a.line_number || 0) - (b.line_number || 0)
         );
 
-        // Map report clauses into local editable state (defaults to original text, gray state)
+        // Map report clauses into local editable state
         const initialClauses: EditableClauseState[] = sortedClauses.map((c, idx) => ({
+          clause_id: c.clause_id || `clause_${idx + 1}`,
           originalIndex: idx,
           name: c.name,
           risk: c.risk,
           reason: c.reason,
           original: c.original,
           suggestion: c.suggestion,
-          editedText: c.original, // Start as original text (GRAY state until user applies amendment)
+          editedText: c.original, // Start as original text
           line_number: c.line_number || (idx * 14 + 3),
           topic: c.topic || c.name,
+          diff_segments: c.diff_segments,
         }));
         setClausesState(initialClauses);
+
+        const initialStatuses: Record<string | number, 'accepted' | 'rejected' | 'pending'> = {};
+        initialClauses.forEach((c) => {
+          const key = c.clause_id || c.originalIndex;
+          initialStatuses[key] = 'pending';
+        });
+        setClauseStatuses(initialStatuses);
+
 
       } catch (err: any) {
         setError(err.message || 'Failed to load report clauses.');
@@ -586,10 +672,38 @@ export default function AmendmentsPage() {
           } space-y-6`}
         >
 
+          {/* TOP SUMMARY BAR WITH ACCEPTED / REJECTED / PENDING COUNTS & LIVE SCORE */}
+          {report && totalClauses > 0 && (
+            <div className="editorial-card rounded-3xl p-5 bg-[#0A192F] text-white border border-[#C5A059]/40 shadow-xl flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Accepted: {Object.values(clauseStatuses).filter(s => s === 'accepted').length}</span>
+                </div>
 
-          
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-mono font-bold">
+                  <Ban size={14} className="text-red-400" />
+                  <span>Rejected: {Object.values(clauseStatuses).filter(s => s === 'rejected').length}</span>
+                </div>
+
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold">
+                  <AlertTriangle size={14} className="text-amber-400" />
+                  <span>Pending: {Object.values(clauseStatuses).filter(s => s === 'pending').length}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-300 uppercase tracking-wider">Live Weighted Risk Score:</span>
+                <div className="px-4 py-1.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/40 text-[#C5A059] text-sm font-mono font-extrabold shadow-sm">
+                  <AnimatedScore value={liveRiskScore} /> / 3.00
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Global Batch Controls & Filter Toolbar */}
           <div className="editorial-card rounded-3xl p-5 bg-white border border-[#0A192F]/10 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+
             
             {/* Search Input */}
             <div className="relative w-full lg:w-64">
@@ -728,34 +842,69 @@ export default function AmendmentsPage() {
                   </div>
                 </div>
 
-                {/* USER DECISION SELECTION BAR (IGNORE RISK VS APPLY AMENDMENT) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-[#F4F5F7] rounded-2xl border border-[#0A192F]/10">
-                  <button
-                    type="button"
-                    onClick={() => handleResetToOriginal(idx)}
-                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all duration-300 ease-out active:scale-95 hover:scale-[1.01] ${
-                      isOriginalMatch
-                        ? 'bg-slate-800 text-white shadow-md border border-slate-700 ring-2 ring-slate-400'
-                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                    }`}
-                  >
-                    <Ban size={14} className={isOriginalMatch ? 'text-amber-400' : 'text-slate-500'} />
-                    <span>🚫 Ignore Risk (Keep Original)</span>
-                  </button>
+                {/* INLINE WORD-LEVEL DIFF VIEWER COMPONENT */}
+                <DiffViewer
+                  diffSegments={clauseItem.diff_segments}
+                  originalText={clauseItem.original}
+                  amendedText={clauseItem.editedText || clauseItem.suggestion}
+                />
+
+                {/* ACCEPT / REJECT TOGGLE BAR */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#F4F5F7] rounded-2xl border border-[#0A192F]/10">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const key = clauseItem.clause_id || idx;
+                        updateClauseStatus(key, 'accepted');
+                        handleApplyAiSuggestion(idx);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-mono font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                        (clauseStatuses[clauseItem.clause_id || idx] === 'accepted' || (!isOriginalMatch && clauseStatuses[clauseItem.clause_id || idx] !== 'rejected'))
+                          ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400'
+                          : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-300'
+                      }`}
+                    >
+                      <Check size={14} />
+                      <span>Accept Amendment</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const key = clauseItem.clause_id || idx;
+                        updateClauseStatus(key, 'rejected');
+                        handleResetToOriginal(idx);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-mono font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                        (clauseStatuses[clauseItem.clause_id || idx] === 'rejected' || isOriginalMatch)
+                          ? 'bg-red-600 text-white shadow-md ring-2 ring-red-400'
+                          : 'bg-white text-red-700 hover:bg-red-50 border border-red-300'
+                      }`}
+                    >
+                      <Ban size={14} />
+                      <span>Reject Amendment</span>
+                    </button>
+                  </div>
 
                   <button
                     type="button"
-                    onClick={() => handleApplyAiSuggestion(idx)}
-                    className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all duration-300 ease-out active:scale-95 hover:scale-[1.01] ${
-                      !isOriginalMatch
-                        ? 'btn-gold text-[#0A192F] shadow-md ring-2 ring-[#C5A059]'
-                        : 'bg-white text-[#0A192F] hover:bg-[#F4F5F7] border border-slate-200'
+                    onClick={() => {
+                      const key = clauseItem.clause_id || idx;
+                      updateClauseStatus(key, 'pending');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-mono font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                      clauseStatuses[clauseItem.clause_id || idx] === 'pending'
+                        ? 'bg-slate-800 text-white border border-slate-700'
+                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                     }`}
                   >
-                    <Sparkles size={14} className={!isOriginalMatch ? 'text-[#0A192F]' : 'text-[#C5A059]'} />
-                    <span>✨ Apply Amendment (AI / Custom)</span>
+                    <RotateCcw size={12} />
+                    <span>Reset</span>
                   </button>
+
                 </div>
+
 
 
 
