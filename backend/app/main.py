@@ -30,14 +30,16 @@ app = FastAPI(
     description="SaaS Legal Contract Clause Risk Tagger API"
 )
 
-# Enable CORS for Next.js frontend dev & production
+# Enable CORS for Next.js frontend dev & production with secure origin matching
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for local hackathon testing
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Secure regex for Vercel preview & production deployments
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # Mount API routes under /api
 app.include_router(api_router, prefix=settings.API_V1_STR)

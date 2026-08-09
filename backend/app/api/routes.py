@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 
 from app import models
+from app.config import settings
 from app.database import get_db
+
 from app.schemas import (
     AnalysisResponse, HistoryItemResponse, ClauseAnalysis, UpdateClausesRequest, 
     DiffSegment, RecalculateScoreRequest, RecalculateScoreResponse, ScoreBreakdown
@@ -89,20 +91,37 @@ async def analyze_contract(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Uploaded file must have a valid filename.")
 
+    # 1. Filename sanitization to protect against directory traversal
+    safe_filename = os.path.basename(file.filename.replace("\\", "/"))
+    ext = os.path.splitext(safe_filename)[1].lower()
+    if ext not in [".pdf", ".docx", ".txt"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file format '{ext}'. Allowed types: .pdf, .docx, .txt"
+        )
+
     try:
         contents = await file.read()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {str(e)}")
 
-    # 2. Text extraction
+    # 2. File size validation to prevent DoS via large file payloads
+    max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(contents) > max_size_bytes:
+        raise HTTPException(
+            status_code=413, 
+            detail=f"Uploaded file exceeds maximum limit of {settings.MAX_UPLOAD_SIZE_MB}MB."
+        )
+
+    # 3. Text extraction
     try:
-        extracted_text = extract_text_from_file(contents, file.filename)
+        extracted_text = extract_text_from_file(contents, safe_filename)
     except ValueError as ve:
         raise HTTPException(status_code=422, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Text extraction error: {str(e)}")
 
-    # 3. AI Risk Analysis
+    # 4. AI Risk Analysis
     try:
         report_data = analyze_contract_text(extracted_text, contract_type=contract_type or "General/Other")
     except ValueError as ve:
@@ -110,12 +129,12 @@ async def analyze_contract(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI clause analysis failed: {str(e)}")
 
-
-    # 4. Persistence (saves contract, report, clauses, and transaction)
+    # 5. Persistence (saves contract, report, clauses, and transaction)
     try:
-        db_report = save_contract_analysis(db, file.filename, report_data, payment_info)
+        db_report = save_contract_analysis(db, safe_filename, report_data, payment_info)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to persist report to database: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to persist report to database.")
+
 
     # 5. Format and return response
     clauses_response = [_format_clause_response(c, i) for i, c in enumerate(db_report.clauses, 1)]

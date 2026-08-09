@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     ALGORAND_ALGOD_SERVER: str = "https://testnet-api.algonode.cloud"
     ALGORAND_ALGOD_TOKEN: str = ""
 
+    # Security Hardening Configurations
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    MAX_UPLOAD_SIZE_MB: int = 10
+
+
     model_config = SettingsConfigDict(
         env_file=("backend/.env", ".env"),
         env_file_encoding="utf-8",

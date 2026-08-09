@@ -10,6 +10,7 @@ Queries the Algorand TestNet Indexer (https://testnet-idx.algonode.cloud) to ver
 
 import base64
 import logging
+import re
 import httpx
 from typing import Dict, Any, Optional
 
@@ -38,6 +39,14 @@ def verify_transaction_on_chain(
 
     cleaned_txid = tx_id.strip()
 
+    # Security check: Ensure transaction ID contains strictly safe characters
+    if not re.match(r"^[A-Za-z0-9_-]+$", cleaned_txid):
+        return {
+            "verified": False,
+            "reason": "Malformed transaction ID format",
+            "confirmed_round": None
+        }
+
     # Stub / test mode fallback for local test suites
     if cleaned_txid.startswith("tx_stub_") or cleaned_txid.startswith("tx_algo_testnet_"):
         return {
@@ -45,6 +54,7 @@ def verify_transaction_on_chain(
             "reason": "Verified stub payment",
             "confirmed_round": 66072000
         }
+
 
     url = f"{INDEXER_URL}/v2/transactions/{cleaned_txid}"
 

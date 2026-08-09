@@ -129,9 +129,9 @@ export default function ResultsDashboardPage() {
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           {/* VERIFIED ON-CHAIN BADGE */}
-          {report.payment_txid && (
+          {report.payment_txid && /^[A-Za-z0-9_-]+$/.test(report.payment_txid) && (
             <a
-              href={`https://testnet.explorer.perawallet.app/tx/${report.payment_txid}`}
+              href={`https://testnet.explorer.perawallet.app/tx/${encodeURIComponent(report.payment_txid)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-xs font-mono font-bold hover:bg-emerald-500/20 transition-all shadow-sm"
@@ -141,6 +141,7 @@ export default function ResultsDashboardPage() {
               <span>Verified on-chain ({report.payment_txid.slice(0, 6)}...{report.payment_txid.slice(-4)})</span>
             </a>
           )}
+
 
           {/* EDIT & AMEND CLAUSES BUTTON */}
           <Link
